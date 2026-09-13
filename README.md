@@ -238,6 +238,7 @@ location: China # 位置
 ```
 
 也支持对接 [Memos](https://www.usememos.com/) 作为数据源，在 `src/config/dynamicConfig.ts` 中配置 `memos` 选项即可实时获取 Memos 动态，支持置顶同步和图片附件展示。详见[动态文档](https://docs-firefly.cuteleaf.cn/zh/guide/dynamic.html)。
+测试自动部署
 
 ## 🧩 Markdown 扩展语法
 
