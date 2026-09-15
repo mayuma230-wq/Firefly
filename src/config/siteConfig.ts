@@ -42,17 +42,17 @@ const pages = resolvePageToggles({
 
 export const siteConfig: SiteConfig = {
 	// 站点标题
-	title: "龚敏给你们豆沙了",
+	title: "春风不是个人",
 
 	// 站点副标题
-	subtitle: "敏给你们豆沙了",
+	subtitle: "春风不是个人",
 
 	// 站点 URL
 	site_url: "https://majunyu.xyz",
 
 	// 站点描述
 	description:
-		"敏给你们豆沙了敏给你们豆沙了敏给你们豆沙了敏给你们豆沙了敏给你们豆沙了",
+		"龙猫要给你们都杀了！龙猫要给你们都杀了！龙猫要给你们都杀了",
 
 	// 站点关键词
 	keywords: [
