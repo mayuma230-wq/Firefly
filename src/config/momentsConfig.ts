@@ -38,7 +38,7 @@ export interface MomentsPageConfig {
 export const momentsCover: MomentsCover = {
 	cover_image: "http://tu.fqzlr.com/file/beijing/1777365393328_bkg__7_.png",
 	cover_avatar: "/assets/images/avatar.svg",
-	cover_name: "马俊宇",
+	cover_name: "majunyu",
 	cover_bio: "躬身入局，心为主理，行有尺度，自持本心.",
 };
 
@@ -46,7 +46,7 @@ export const momentsCover: MomentsCover = {
 export const momentsConfig: MomentItem[] = [
 	{
 		id: "2026-07-06-ceshi2",
-		author: "马俊宇",
+		author: "majunyu",
 		pinned: true,
 		published: "2026-07-06",
 		location: "杭州",

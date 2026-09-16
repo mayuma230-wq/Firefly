@@ -13,10 +13,10 @@ export const profileConfig: ProfileConfig = {
 	// 下班时间头像（为空则始终使用上方 avatar）
 	avatarOffWork: "assets/images/xiaban.gif",
 
-	name: "马俊宇", // 名字
+	name: "majunyu", // 名字
 
 	// 首页展示名字（留空则使用 name）
-	displayName: "马俊宇的博客",
+	displayName: "majunyu",
 
 	// 职业/身份标签
 	occupation: "[啥都不会 / 无技术博主]",

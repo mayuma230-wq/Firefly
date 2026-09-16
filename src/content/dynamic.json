@@ -6,7 +6,7 @@
 		"tags": ["测试", "动态"],
 		"location": "杭州",
 		"device": "Windows",
-		"author": "马俊宇",
+		"author": "majunyu",
 		"avatar": "/assets/images/avatar.svg",
 		"body": ""
 	},
@@ -28,7 +28,7 @@
 		"tags": [],
 		"location": "杭州",
 		"device": "xiaomi13",
-		"author": "马俊宇",
+		"author": "majunyu",
 		"avatar": "/assets/images/avatar.svg",
 		"body": "修复卡片透明度调节",
 		"_draft": true

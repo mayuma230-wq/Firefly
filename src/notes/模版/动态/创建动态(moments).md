@@ -1,5 +1,5 @@
 ---
-author: 马俊宇
+author: majunyu
 avatar: /assets/images/avatar.svg
 pinned: false
 published:

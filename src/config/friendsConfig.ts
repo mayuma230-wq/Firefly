@@ -73,7 +73,7 @@ export const friendsPageConfig: FriendsPageConfig = {
 // 友链配置
 export const friendsConfig: FriendLink[] = [
 	{
-		title: "马俊宇",
+		title: "majunyu",
 		imgurl: "/assets/images/avatar.svg",
 		desc: "躬身入局，心为主理，行有尺度，自持本心.",
 		siteurl: "https://majunyu.pages.dev/",

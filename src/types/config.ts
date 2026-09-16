@@ -48,9 +48,9 @@ export type HomeBlindsHeroConfig = {
 	enabled?: boolean;
 	/** 职业/身份标签，如「[啥都不会 / 无技术博主]」 */
 	occupation?: string;
-	/** 大标题，如「马俊宇的博客」 */
+	/** 大标题，如「majunyu」 */
 	displayName?: string;
-	/** 徽章文字，如「B站：马俊宇」 */
+	/** 徽章文字，如「B站：majunyu」 */
 	badge?: string;
 	/** 个人签名 */
 	bio?: string;

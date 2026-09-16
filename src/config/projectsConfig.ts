@@ -8,7 +8,7 @@ export const projectsPageConfig: CollectionsApiConfig = {
 	description: "收录个人网站、常用工具和收藏网站",
 	apis: [
 		{
-			category: "马俊宇",
+			category: "majunyu",
 			items: [
 				{
 					name: "小马の主页",

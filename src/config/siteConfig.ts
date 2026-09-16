@@ -52,10 +52,10 @@ const regionBlockRoutes: Record<string, boolean> = {
 
 export const siteConfig: SiteConfig = {
 	// 站点标题
-	title: "马俊宇的博客",
+	title: "majunyu",
 
 	// 站点副标题
-	subtitle: "马俊宇",
+	subtitle: "majunyu",
 
 	// 站点 URL
 	site_url: "https://majunyu.pages.dev/",
@@ -130,7 +130,7 @@ export const siteConfig: SiteConfig = {
 			alt: "logo",
 		},
 		// 导航栏标题
-		title: "马俊宇的博客",
+		title: "majunyu",
 		// 悬停时显示的互动颜文字
 		hoverTitle: "w(ﾟДﾟ)w 不要走！再看看嘛！",
 		// 全宽导航栏，导航栏是否占满屏幕宽度，true：占满，false：不占满
@@ -146,12 +146,12 @@ export const siteConfig: SiteConfig = {
 	portal: {
 		announcement: {
 			enable: true,
-			text: "欢迎来到马俊宇的博客！专注NAS分享、AI实践、学习笔记与技术总结。",
+			text: "欢迎来到 majunyu 的博客！专注NAS分享、AI实践、学习笔记与技术总结。",
 		},
 		dailyQuote: {
 			enable: true,
 			quotes: [
-				{ text: "躬身入局，心为主理，行有尺度，自持本心", source: "马俊宇" },
+				{ text: "躬身入局，心为主理，行有尺度，自持本心", source: "majunyu" },
 			],
 		},
 		recentPostsCount: 3,
