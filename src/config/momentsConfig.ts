@@ -36,7 +36,7 @@ export interface MomentsPageConfig {
 
 // 说说封面配置
 export const momentsCover: MomentsCover = {
-	cover_image: "http://tu.fqzlr.com/file/beijing/1777365393328_bkg__7_.png",
+	cover_image: "https://cloudflare-imgbed.mayuma230.workers.dev/file/1789538393889_illust_106202178_20260916_124133.png",
 	cover_avatar: "/assets/images/avatar.svg",
 	cover_name: "majunyu",
 	cover_bio: "混吃等死，就想躺平，不想上班，自持本心.",
