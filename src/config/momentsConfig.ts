@@ -39,7 +39,7 @@ export const momentsCover: MomentsCover = {
 	cover_image: "http://tu.fqzlr.com/file/beijing/1777365393328_bkg__7_.png",
 	cover_avatar: "/assets/images/avatar.svg",
 	cover_name: "majunyu",
-	cover_bio: "躬身入局，心为主理，行有尺度，自持本心.",
+	cover_bio: "混吃等死，就想躺平，不想上班，自持本心.",
 };
 
 // 说说列表配置
