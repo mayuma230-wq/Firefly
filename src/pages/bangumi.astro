@@ -10,9 +10,6 @@ import type {
 	UserSubjectCollectionResponse,
 } from "@/types/bangumi";
 import { formatDateI18nWithTime } from "@/utils/date-utils";
-import { filterNsfw, isBangumiNsfw } from "@/utils/nsfw-utils";
-
-//参考：霞葉 https://kasuha.com/posts/fuwari-enhance-ep2/
 
 // 检查页面是否启用
 if (!siteConfig.pages.bangumi) {
@@ -23,32 +20,28 @@ if (!siteConfig.pages.bangumi) {
 const buildTime = formatDateI18nWithTime(new Date());
 
 ////////////// Bangumi 配置 ////////////////////////
-const bangumiConfig = {
-	username: siteConfig.bangumi?.userId, // 在这里配置你的Bangumi用户名
+const bangumiApiConfig = {
+	username: siteConfig.bangumi?.userId,
 	mode: (siteConfig.bangumi?.mode || "static") as "static" | "dynamic",
 	apiUrl: siteConfig.bangumi?.apiUrl || "https://api.bangumi.one",
 	subjectBaseUrl:
 		siteConfig.bangumi?.subjectBaseUrl || "https://bangumi.one/subject/",
-	// 从配置文件中读取各分类是否启用，若未配置则使用默认值
 	categories: {
-		book: siteConfig.bangumi?.categories?.book ?? true,
-		anime: siteConfig.bangumi?.categories?.anime ?? true,
-		music: siteConfig.bangumi?.categories?.music ?? true,
-		game: siteConfig.bangumi?.categories?.game ?? true,
-		real: siteConfig.bangumi?.categories?.real ?? false,
+		book: siteConfig.bangumi?.categories?.book ? true : false,
+		anime: siteConfig.bangumi?.categories?.anime ? true : false,
+		music: siteConfig.bangumi?.categories?.music ? true : false,
+		game: siteConfig.bangumi?.categories?.game ? true : false,
+		real: siteConfig.bangumi?.categories?.real ? true : false,
 	},
-	// 数据获取设置
 	pagination: {
-		limit: 50, // 每页获取数量
-		delay: 50, // 请求间隔毫秒数，避免频率限制
-		maxTotal: 1000, // 最大获取总数，防止无限循环（0=无限制）
+		limit: 50,
+		delay: 50,
+		maxTotal: 1000,
 	},
-	// NSFW 处理："off" | "blur" | "hide"
-	nsfw: siteConfig.bangumi?.nsfw ?? "off",
 };
 //////////////////////////////////////////////////
 
-const isDynamic = bangumiConfig.mode === "dynamic";
+const isDynamic = bangumiApiConfig.mode === "dynamic";
 
 // 分类映射
 const categoryMap = {
@@ -69,46 +62,44 @@ const categoryMap = {
 
 // 获取Bangumi数据的函数 - 支持分页获取所有数据
 async function fetchBangumiData(username: string, subjectType: number) {
-	const { limit, delay, maxTotal } = bangumiConfig.pagination;
+	const { limit, delay, maxTotal } = bangumiApiConfig.pagination;
 	let offset = 0;
 	let allData: UserSubjectCollection[] = [];
 	let hasMore = true;
 
 	// 开发模式下只获取一页数据，加快调试速度
 	const isDev = import.meta.env.DEV;
-	const maxPages = isDev ? 1 : 0; // 0 表示不限制
+	const maxPages = isDev ? 1 : 0;
 
 	console.log(
-		`[Bangumi] ${isDev ? "🔧 Dev mode" : "🌐 Prod mode"} - fetching subjectType ${subjectType} data for user ${username}...`,
+		`[Bangumi] ${isDev ? "🔧 开发模式" : "🌐 生产模式"} - 开始获取用户 ${username} 的 subjectType ${subjectType} 数据...`,
 	);
 
 	while (hasMore) {
-		// 开发模式限制：只获取一页
 		if (isDev && maxPages > 0 && allData.length >= limit * maxPages) {
-			console.log(`[Bangumi] Dev mode: fetched ${maxPages} page(s), stopping`);
+			console.log(`[Bangumi] 开发模式：已获取 ${maxPages} 页数据，停止获取`);
 			break;
 		}
 
-		// 检查是否超过最大获取限制
 		if (maxTotal > 0 && allData.length >= maxTotal) {
-			console.log(`[Bangumi] Reached max fetch limit ${maxTotal}, stopping`);
+			console.log(`[Bangumi] 已达到最大获取限制 ${maxTotal}，停止获取`);
 			break;
 		}
 
-		const url = `${bangumiConfig.apiUrl}/v0/users/${username}/collections?subject_type=${subjectType}&limit=${limit}&offset=${offset}`;
+		const url = `${bangumiApiConfig.apiUrl}/v0/users/${username}/collections?subject_type=${subjectType}&limit=${limit}&offset=${offset}`;
 
-		console.log(`[Bangumi] Fetching data: ${url} (fetched: ${allData.length})`);
+		console.log(`[Bangumi] 正在获取数据: ${url} (已获取: ${allData.length})`);
 
 		const response = await fetch(url, {
 			headers: {
-				"User-Agent": "YuuOuRou Blog",
+				"User-Agent": "马俊宇 Blog",
 				Accept: "application/json",
 			},
 		});
 
 		if (!response.ok) {
 			throw new Error(
-				`[Bangumi] Failed to fetch data (status: ${response.status}): ${url}`,
+				`[Bangumi] 无法获取数据 (状态码: ${response.status}): ${url}`,
 			);
 		}
 
@@ -119,7 +110,6 @@ async function fetchBangumiData(username: string, subjectType: number) {
 			allData = allData.concat(currentBatch);
 			offset += limit;
 
-			// 如果本次获取的数据少于limit，说明已经是最后一页
 			if (currentBatch.length < limit) {
 				hasMore = false;
 			}
@@ -127,13 +117,12 @@ async function fetchBangumiData(username: string, subjectType: number) {
 			hasMore = false;
 		}
 
-		// 添加延迟避免请求过于频繁
 		if (hasMore) {
 			await new Promise((resolve) => setTimeout(resolve, delay));
 		}
 	}
 
-	console.log(`[Bangumi] Fetched ${allData.length} items in total`);
+	console.log(`[Bangumi] 总共获取到 ${allData.length} 条数据`);
 	return allData;
 }
 
@@ -144,21 +133,18 @@ let fetchFailed = false;
 
 // 检查是否已配置 Bangumi 用户ID
 const isUserIdConfigured =
-	bangumiConfig.username &&
-	bangumiConfig.username !== "you-user-id" &&
-	bangumiConfig.username.trim() !== "";
+	bangumiApiConfig.username && bangumiApiConfig.username.trim() !== "";
 
 if (!isUserIdConfigured) {
-	console.log("[Bangumi] ⚠️ Bangumi user ID not configured, skipping fetch");
+	console.log("[Bangumi] ⚠️ 未配置 Bangumi 用户ID，跳过数据获取");
 } else if (!isDynamic) {
-	console.log("[Bangumi] 🌐 Fetching data from API (static mode)");
+	console.log("[Bangumi] 🌐 从 API 获取数据（static 模式）");
 }
 
 if (!isDynamic) {
 	for (const [categoryKey, enabled] of Object.entries(
-		bangumiConfig.categories,
+		bangumiApiConfig.categories,
 	)) {
-		// 如果未配置用户ID，跳过数据获取
 		if (!isUserIdConfigured) {
 			break;
 		}
@@ -166,27 +152,17 @@ if (!isDynamic) {
 			const categoryInfo = categoryMap[categoryKey as keyof typeof categoryMap];
 			try {
 				const data = await fetchBangumiData(
-					// biome-ignore lint/style/noNonNullAssertion: Checked by isUserIdConfigured
-					bangumiConfig.username!,
+					bangumiApiConfig.username!,
 					categoryInfo.subjectType,
 				);
-				// NSFW 拦截：hide 模式下过滤掉 NSFW 条目，保持标签页计数一致
-				const filteredData = filterNsfw(
-					data,
-					bangumiConfig.nsfw,
-					isBangumiNsfw,
-				);
-				bangumiData[categoryKey] = filteredData;
+				bangumiData[categoryKey] = data;
 				tabs.push({
 					id: categoryKey,
 					name: categoryInfo.name,
-					count: filteredData.length,
+					count: data.length,
 				});
 			} catch (error) {
-				console.error(
-					`[Bangumi] Failed to fetch ${categoryInfo.name} data:`,
-					error,
-				);
+				console.error(`[Bangumi] 获取 ${categoryInfo.name} 数据失败:`, error);
 				fetchFailed = true;
 				break;
 			}
@@ -197,20 +173,15 @@ if (!isDynamic) {
 	const categoryOrder = siteConfig.bangumi?.categoryOrder || [];
 	if (categoryOrder.length > 0) {
 		tabs.sort((a, b) => {
-			const aIndex = categoryOrder.indexOf(
-				a.id as (typeof categoryOrder)[number],
-			);
-			const bIndex = categoryOrder.indexOf(
-				b.id as (typeof categoryOrder)[number],
-			);
-			// 如果类型在配置中，按配置顺序排序；否则排在后面
+			const aIndex = categoryOrder.indexOf(a.id);
+			const bIndex = categoryOrder.indexOf(b.id);
 			if (aIndex === -1 && bIndex === -1) return 0;
 			if (aIndex === -1) return 1;
 			if (bIndex === -1) return -1;
 			return aIndex - bIndex;
 		});
 	}
-} // end if (!isDynamic)
+}
 
 const activeTab = tabs[0]?.id || "anime";
 ---
@@ -223,7 +194,7 @@ const activeTab = tabs[0]?.id || "anime";
             <div class="mb-6">
                 <div class="flex items-center gap-3 mb-3">
                     <div class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70">
-                        <Icon name="material-symbols:movie" class="text-[1.5rem]"></Icon>
+                        <Icon is:inline name="material-symbols:movie" class="text-[1.5rem]"></Icon>
                     </div>
                     <div class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
                         {i18n(I18nKey.bangumi)}
@@ -245,7 +216,7 @@ const activeTab = tabs[0]?.id || "anime";
           {!isUserIdConfigured ? (
             <div class="text-center py-16">
               <div class="inline-flex items-center justify-center w-16 h-16 bg-(--btn-regular-bg) rounded-full mb-6 border border-(--line-divider)">
-                <Icon name="material-symbols:settings" class="text-[2rem] text-(--btn-content)" />
+                <Icon is:inline name="material-symbols:settings" class="text-[2rem] text-(--btn-content)" />
               </div>
               <h2 class="text-xl font-semibold text-black/80 dark:text-white/80 mb-3">
                 未配置 Bangumi 用户ID
@@ -257,14 +228,13 @@ const activeTab = tabs[0]?.id || "anime";
           ) : (
             <BangumiGrid
               client:load
-              subjectBaseUrl={bangumiConfig.subjectBaseUrl}
+              subjectBaseUrl={bangumiApiConfig.subjectBaseUrl}
               fetchConfig={{
-                username: bangumiConfig.username!,
-                apiUrl: bangumiConfig.apiUrl,
-                categories: bangumiConfig.categories,
+                username: bangumiApiConfig.username!,
+                apiUrl: bangumiApiConfig.apiUrl,
+                categories: bangumiApiConfig.categories,
                 categoryOrder: siteConfig.bangumi?.categoryOrder || [],
-                pagination: bangumiConfig.pagination,
-                nsfw: bangumiConfig.nsfw,
+                pagination: bangumiApiConfig.pagination,
               }}
             />
           )}
@@ -275,7 +245,7 @@ const activeTab = tabs[0]?.id || "anime";
       {fetchFailed ? (
         <div class="text-center py-16">
           <div class="inline-flex items-center justify-center w-16 h-16 bg-(--btn-regular-bg) rounded-full mb-6 border border-(--line-divider)">
-            <Icon name="material-symbols:error-outline" class="text-[2rem] text-red-500" />
+            <Icon is:inline name="material-symbols:error-outline" class="text-[2rem] text-red-500" />
           </div>
           <h2 class="text-xl font-semibold text-black/80 dark:text-white/80 mb-3">
             {i18n(I18nKey.bangumiFetchError)}
@@ -286,12 +256,12 @@ const activeTab = tabs[0]?.id || "anime";
         </div>
       ) : tabs.length > 0 ? (
         <>
-          <BangumiGrid client:load tabs={tabs} initialActiveTab={activeTab} bangumiData={bangumiData} subjectBaseUrl={bangumiConfig.subjectBaseUrl} nsfw={bangumiConfig.nsfw} />
+          <BangumiGrid client:load tabs={tabs} initialActiveTab={activeTab} bangumiData={bangumiData} subjectBaseUrl={bangumiApiConfig.subjectBaseUrl} />
         </>
       ) : (
         <div class="text-center py-16">
           <div class="inline-flex items-center justify-center w-16 h-16 bg-(--btn-regular-bg) rounded-full mb-6 border border-(--line-divider)">
-            <Icon name="material-symbols:settings" class="text-[2rem] text-(--btn-content)" />
+            <Icon is:inline name="material-symbols:settings" class="text-[2rem] text-(--btn-content)" />
           </div>
           <h2 class="text-xl font-semibold text-black/80 dark:text-white/80 mb-3">
             {isUserIdConfigured ? i18n(I18nKey.bangumiEmpty) : "未配置 Bangumi 用户ID"}
@@ -307,13 +277,3 @@ const activeTab = tabs[0]?.id || "anime";
     </div>
   </div>
 </MainGridLayout>
-
-<style>
-  /* 自定义样式 */
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-</style>

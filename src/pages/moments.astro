@@ -1,0 +1,195 @@
+---
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import { Icon } from "astro-icon/components";
+import Comment from "@/components/comment/index.astro";
+import MomentsEditor from "@/components/edit/MomentsEditor.svelte";
+import MomentCard from "@/components/moments/MomentCard.astro";
+import MomentsCover from "@/components/moments/MomentsCover.astro";
+import {
+	getEnabledMoments,
+	momentsCover,
+	momentsPageConfig,
+} from "@/config/momentsConfig";
+
+/**
+ * 页面已迁移至 /dynamic/
+ * --------------------------------------------------------------
+ * 旧的「说说」页面已被新的 /dynamic/ 页面取代（迁移自 Firefly 主题）。
+ * 为避免外部链接失效，本页面通过服务端重定向将所有访问者导向
+ * /dynamic/。置顶页 /moments/pinned/ 不受影响，可继续访问。
+ */
+return Astro.redirect("/dynamic/");
+
+// 下方代码为保留的旧实现，因重定向而不再执行；如需恢复
+// 「说说」独立页面，注释掉上面的 return 即可。
+/* eslint-disable */
+
+// 从 momentsConfig.ts 读取说说数据
+const allMoments = getEnabledMoments();
+
+const coverImage = momentsCover.cover_image;
+const coverAvatar = momentsCover.cover_avatar;
+const coverName = momentsCover.cover_name;
+const coverBio = momentsCover.cover_bio;
+
+// 置顶说说
+const pinnedMoments = allMoments.filter((m) => m.pinned);
+// 普通说说（按时间倒序）
+const sortedMoments = allMoments.filter((m) => !m.pinned);
+
+// 预处理置顶说说
+const pinnedData = pinnedMoments.map((m) => ({
+	images: m.images || [],
+	body: m.body || "",
+	date: new Date(m.published),
+}));
+
+const albums = [] as any[];
+---
+
+<MainGridLayout title="动态" description="记录生活中的点点滴滴">
+  <div class="moments-page">
+    <!-- 微信朋友圈风格封面（用户保留原样） -->
+    <MomentsCover coverImage={coverImage} coverAvatar={coverAvatar} coverName={coverName} coverBio={coverBio} />
+
+    <!-- 置顶说说（始终渲染容器，JS 可动态追加外部置顶） -->
+    <div class="wx-pinned" id="pinned-block" style={pinnedMoments.length === 0 ? 'display:none' : ''}>
+      <a href="/moments/pinned/" class="wx-pinned-link">
+        <div class="wx-pinned-tag">
+          <span>置顶</span>
+        </div>
+        <div class="wx-pinned-items" id="pinned-items">
+          {pinnedData.map((item) => (
+            <div class="wx-pinned-preview">
+              {item.images.length > 0 ? (
+                <div class={`wx-pimgs wx-pimgs-${Math.min(item.images.length, 9)}`}>
+                  {item.images.slice(0, 9).map((img) => (
+                    <img src={img} alt="" class="wx-pinned-img" loading="lazy" />
+                  ))}
+                </div>
+              ) : (
+                <p class="wx-ptxt">{item.body.slice(0, 60)}{item.body.length > 60 ? '...' : ''}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </a>
+      <!-- 隐藏的完整卡片供编辑组件收集数据 -->
+      <div class="wx-pinned-hidden">
+        {pinnedMoments.map((moment) => (
+          <MomentCard moment={moment} />
+        ))}
+      </div>
+    </div>
+
+    <!-- 说说列表（本地 + 外部合并，按时间排序） -->
+    <div class="moments-body">
+      <div class="moments-timeline" id="moments-feed">
+        {sortedMoments.length > 0 ? (
+          sortedMoments.map((moment) => (
+            <MomentCard moment={moment} />
+          ))
+        ) : (
+          <div class="wx-empty" id="moments-empty">
+            <div class="wx-empty-icon">
+              <Icon name="material-symbols:sentiment-neutral-outline" />
+            </div>
+            <h3>还没有发布任何说说</h3>
+            <p>快去记录你的生活点滴吧</p>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+
+  <MomentsEditor client:load />
+
+  <!-- 评论区 -->
+  <div id="moments-comments">
+    <Comment customPath="/moments/" />
+  </div>
+
+  <!-- 访客统计 -->
+  <div class="wx-visitor">
+    <Icon name="material-symbols:visibility-outline" class="wx-visitor-icon" />
+    <span class="waline-count" data-path="/moments/">-</span>
+    <span>次浏览</span>
+  </div>
+</MainGridLayout>
+
+<script is:inline>
+  var countElements = document.querySelectorAll('.waline-count[data-path="/moments/"]');
+  if (countElements.length > 0) {
+    var serverURL = "";
+    fetch(serverURL + "/api/page?path=/moments/")
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        var arr = Array.isArray(data) ? data : (data && data.data ? data.data : []);
+        var item = arr && arr.length > 0 ? arr[0] : null;
+        var count = item && item.views != null ? Number(item.views) : 0;
+        countElements.forEach(function(el) { el.textContent = String(count); });
+      })
+      .catch(function() {
+        countElements.forEach(function(el) { el.textContent = "-"; });
+      });
+  }
+</script>
+
+
+<style>
+  /* 置顶块样式在 features/moments.css 中定义，
+     因为 JS 动态创建的外部置顶元素没有 Astro scoped 属性 */
+
+  /* ============================================
+   * 说说列表
+   * ============================================ */
+  .wx-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: var(--moments-surface);
+    border: var(--moments-border-width) solid var(--moments-border);
+    border-radius: var(--moments-radius-card);
+  }
+
+  .wx-empty-icon {
+    width: 4rem;
+    height: 4rem;
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--moments-soft);
+    border-radius: 50%;
+    color: var(--content-meta);
+    font-size: 2rem;
+  }
+
+  .wx-empty h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--deep-text);
+    margin-bottom: 0.375rem;
+  }
+
+  .wx-empty p {
+    font-size: 0.875rem;
+    color: var(--content-meta);
+    margin: 0;
+  }
+
+  /* 访客统计 */
+  .wx-visitor {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    margin: 1.5rem auto 0;
+    padding: 0.75rem;
+    color: var(--content-meta);
+    font-size: 0.8125rem;
+  }
+
+  .wx-visitor-icon {
+    font-size: 1rem;
+  }
+</style>

@@ -1,0 +1,224 @@
+---
+import { Icon } from "astro-icon/components";
+import PageHeader from "@/components/common/PageHeader.astro";
+import PengyouEditor from "@/components/edit/PengyouEditor.svelte";
+import { circleConfig } from "@/config/circleConfig";
+import { pengyouConfig } from "@/config/pengyouConfig";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import {
+	fetchPengyouItems,
+	formatPengyouDate as formatDate,
+	getPengyouAvatar as getAvatar,
+	type PengyouItem,
+} from "@/utils/pengyou-utils";
+import "@/styles/features/circle.css";
+
+const title = "朋友圈";
+const description = "来看看我的朋友们都在干嘛";
+
+const items: PengyouItem[] = await fetchPengyouItems();
+const { rss } = pengyouConfig;
+
+const totalFriends = new Set(items.map((i) => i.author)).size;
+const totalArticles = items.length;
+const itemsJson = JSON.stringify(
+	items.map((i) => ({
+		...i,
+		avatar: getAvatar(i),
+	})),
+);
+---
+
+<MainGridLayout title={title} description={description}>
+  <!-- 页面页头：面包屑 + 标题 + 右侧操作 slot（全部友链） -->
+  <PageHeader
+    title={title}
+    eyebrow="Circle"
+    variant="stacked"
+    breadcrumbs={[{ name: title, icon: "material-symbols:group" }]}
+  >
+    <a
+      href="/friends/"
+      class="pengyou-all-friends-link"
+    >
+      全部友链
+      <Icon name="material-symbols:chevron-right-rounded" class="text-base" />
+    </a>
+  </PageHeader>
+
+  <div class="circle-container">
+    <!-- 统计区域 -->
+    <div class="circle-stats-bar">
+      <div class="stats-left">
+        <span class="stats-item">好友 <strong id="stat-friends">{totalFriends}</strong></span>
+        <span class="stats-divider">·</span>
+        <span class="stats-item">动态 <strong id="stat-articles">{totalArticles}</strong></span>
+      </div>
+      <div class="stats-right">
+        <button class="sort-btn is-active" data-sort="date" id="sort-date">最新发布</button>
+      </div>
+    </div>
+
+    <!-- RSS 源数据（编辑器读取用） -->
+    <div id="pengyou-rss-sources" style="display:none">
+      {rss.map((source) => (
+        <div
+          class="pengyou-rss-source"
+          data-name={source.name}
+          data-url={source.url}
+          data-enabled={source.enabled !== false ? "true" : "false"}
+        ></div>
+      ))}
+    </div>
+
+    <!-- 编辑器（仅编辑模式可见） -->
+    <div data-no-swup style="padding: 0 1.25rem 1rem;">
+      <PengyouEditor client:load />
+    </div>
+
+    <!-- 文章网格 -->
+    <div id="pengyou-feed">
+      {items.length > 0 ? (
+        <div class="circle-grid" id="circle-grid">
+        {items.slice(0, circleConfig.pageSize).map((item, index) => (
+          <a
+            href={item.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="circle-card"
+            data-full-date={item.date}
+          >
+            <div class="card-avatar-watermark" data-initial={(item.author || "?").slice(0, 1)}>
+              <img src={getAvatar(item)} alt="" loading="lazy" onerror="this.style.display='none'" />
+            </div>
+            <span class="card-date-overlay">{formatDate(item.date)}</span>
+            <h3 class="card-title">{item.title}</h3>
+            <span class="card-author-tag">{item.author}</span>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <div class="circle-error" style="padding: 4rem 1rem;">
+        <Icon name="material-symbols:sentiment-neutral-outline" class="text-4xl text-neutral-400" />
+        <p class="error-text">暂无文章</p>
+      </div>
+    )}
+
+    <!-- 加载更多 -->
+    {items.length > circleConfig.pageSize && (
+      <div class="circle-load-more" id="circle-load-more">
+        <div class="load-more-spinner"></div>
+      </div>
+    )}
+
+    <!-- 没有更多 -->
+    <div class="circle-no-more" id="circle-no-more" style={items.length <= circleConfig.pageSize ? "" : "display:none;"}>
+      <span>—— 没有更多了 ——</span>
+    </div>
+    </div>
+  </div>
+
+<script is:inline define:vars={{ pageSize: circleConfig.pageSize, allItems: itemsJson }}>
+(function() {
+  var displayedCount = pageSize;
+  var isLoadingMore = false;
+  var currentSort = "date";
+  var items = allItems;
+
+  function $(id) { return document.getElementById(id); }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return "";
+    var date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+    var now = new Date();
+    var diffTime = Math.abs(now.getTime() - date.getTime());
+    var diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return "今天";
+    if (diffDays === 1) return "昨天";
+    if (diffDays < 7) return diffDays + "天前";
+    if (diffDays < 30) return Math.floor(diffDays / 7) + "周前";
+    if (diffDays < 365) return Math.floor(diffDays / 30) + "月前";
+    return Math.floor(diffDays / 365) + "年前";
+  }
+
+  function esc(t) {
+    var d = document.createElement("div");
+    d.textContent = t;
+    return d.innerHTML;
+  }
+
+  function renderCard(item) {
+    var title = esc(item.title || "无标题");
+    var author = esc(item.author || "未知");
+    var link = item.link || "#";
+    var avatar = item.avatar || "";
+    var date = formatDate(item.date);
+    var initial = (item.author || "?").slice(0, 1);
+
+    return '<a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer" class="circle-card">' +
+      '<div class="card-avatar-watermark" data-initial="' + initial + '">' +
+        '<img src="' + esc(avatar) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'" />' +
+      '</div>' +
+      '<span class="card-date-overlay">' + date + '</span>' +
+      '<h3 class="card-title">' + title + '</h3>' +
+      '<span class="card-author-tag">' + author + '</span>' +
+    '</a>';
+  }
+
+  function renderGrid() {
+    var grid = $("circle-grid");
+    if (!grid) return;
+
+    var sorted = items.slice();
+    sorted.sort(function(a, b) {
+      return (b.date || "").localeCompare(a.date || "");
+    });
+
+    var toShow = sorted.slice(0, displayedCount);
+    grid.innerHTML = toShow.map(renderCard).join("");
+
+    var loadMore = $("circle-load-more");
+    var noMore = $("circle-no-more");
+    if (displayedCount >= sorted.length) {
+      if (loadMore) loadMore.style.display = "none";
+      if (noMore) noMore.style.display = "";
+    } else {
+      if (loadMore) loadMore.style.display = "";
+      if (noMore) noMore.style.display = "none";
+    }
+  }
+
+  function loadMore() {
+    if (isLoadingMore) return;
+    isLoadingMore = true;
+    setTimeout(function() {
+      displayedCount += pageSize;
+      renderGrid();
+      isLoadingMore = false;
+    }, 300);
+  }
+
+  // 滚动加载更多
+  function onScroll() {
+    var loadMoreEl = $("circle-load-more");
+    if (!loadMoreEl || loadMoreEl.style.display === "none") return;
+    var rect = loadMoreEl.getBoundingClientRect();
+    if (rect.top < window.innerHeight + 200) {
+      loadMore();
+    }
+  }
+
+  window.addEventListener("scroll", onScroll, { passive: true });
+
+  // Swup 导航后重新初始化
+  document.addEventListener("astro:page-load", function() {
+    var grid = $("circle-grid");
+    if (!grid) return;
+    displayedCount = pageSize;
+    renderGrid();
+  });
+})();
+</script>
+
+</MainGridLayout>

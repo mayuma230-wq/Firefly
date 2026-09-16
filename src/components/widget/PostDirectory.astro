@@ -1,0 +1,20 @@
+---
+import WidgetLayout from "@/components/common/WidgetLayout.astro";
+import PostDirectoryList from "@/components/widget/PostDirectoryList.astro";
+import { type CatalogGroup, getCatalogGroups } from "@/utils/content-utils";
+
+interface Props {
+	currentSlug?: string;
+	class?: string;
+	style?: string;
+}
+
+const { currentSlug = "", class: className, style } = Astro.props;
+
+// 拉取按分类分组的文章列表
+const groups: CatalogGroup[] = await getCatalogGroups(currentSlug);
+---
+
+<WidgetLayout id="post-directory" class={className} style={style}>
+	<PostDirectoryList groups={groups} currentPostId={currentSlug} />
+</WidgetLayout>

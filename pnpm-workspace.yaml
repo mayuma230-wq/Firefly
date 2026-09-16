@@ -1,5 +1,31 @@
-packages:
-  - '.'
+packages: []
+
+# 本机（Windows）无法创建目录符号链接：Node 的 fs.symlinkSync(type:'dir') 会
+# 静默降级成「空目录」，pnpm 的隔离式安装因此得到一堆空壳 node_modules/<pkg>，
+# 只有 junction（mklink /J）能用。所以这里必须用扁平目录布局。
+nodeLinker: hoisted
+
+# ⚠️ 扁平布局的副作用：同一个包的多个版本副本会被实体化成多个独立目录。
+# lockfile 里同时存在 acorn@8.15.0 与 acorn@8.17.0，于是：
+#   node_modules/acorn                                    8.17.0  ← 实体 A
+#   node_modules/svelte/node_modules/acorn                8.15.0  ← 实体 B
+#   node_modules/@sveltejs/acorn-typescript/node_modules/acorn 8.15.0 ← 实体 C
+# svelte 内部 `acorn.Parser.extend(tsPlugin())` 用的是 B，插件内部引用的是 C，
+# 二者不是同一模块实例 → token 类型不匹配 → tsPlugin() 静默失效 →
+# 所有 <script lang="ts"> 组件报 js_parse_error: Unexpected token，构建直接失败。
+# 强制收敛为单一版本后不再产生嵌套副本，两者共用同一实例。
+# 注：8.17.0 同时满足 svelte 的 ^8.12.1 与 @sveltejs/acorn-typescript 的 ^8.9.0。
+overrides:
+  acorn: 8.17.0
+
+# 依赖构建脚本开关：
+#   esbuild —— 必须执行（准备平台二进制）
+#   sharp   —— 关闭：其 install 脚本为 `node install/check.js || npm run build`，
+#              预编译检查若不通过会回退到 cmake 源码编译并长时间卡住。
+#              sharp 0.34 自带 @img/sharp-win32-x64 预编译包，无需该脚本。
+#   swup    —— 关闭：其 postinstall 只是 OpenCollective 捐赠提示，
+#              在 Windows cmd 下必然以退出码 1 失败，导致整个安装中断。
 allowBuilds:
   esbuild: true
-  workerd: true
+  sharp: false
+  swup: false

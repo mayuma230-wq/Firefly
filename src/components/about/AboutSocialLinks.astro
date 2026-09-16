@@ -1,0 +1,48 @@
+---
+import Icon from "@/components/common/Icon.astro";
+
+const socialLinks = [
+	{
+		platform: "Email",
+		handle: "3242622523@qq.com",
+		note: "合作 / 交流",
+		href: "mailto:3242622523@qq.com",
+		icon: "material-symbols:mail-outline",
+		brand: "email",
+	},
+	{
+		platform: "RSS",
+		handle: "订阅本站",
+		note: "用阅读器追更",
+		href: "/rss/",
+		icon: "material-symbols:rss-feed",
+		brand: "rss",
+	},
+];
+---
+
+<section class="about-social-links" aria-label="站长联系方式">
+	{socialLinks.map((link) => (
+		<a
+			class={`about-social-links__item about-social-links__item--${link.brand} no-styling`}
+			href={link.href}
+			target="_blank"
+			rel="noopener noreferrer"
+			aria-label={`${link.platform}：${link.handle}`}
+		>
+			<span class="about-social-links__icon" aria-hidden="true">
+				<Icon name={link.icon} />
+			</span>
+			<span class="about-social-links__content">
+				<span class="about-social-links__platform">{link.platform}</span>
+				<span class="about-social-links__handle">{link.handle}</span>
+				<span class="about-social-links__note">{link.note}</span>
+			</span>
+			<Icon
+				name="material-symbols:arrow-outward-rounded"
+				class="about-social-links__arrow"
+				aria-hidden="true"
+			/>
+		</a>
+	))}
+</section>

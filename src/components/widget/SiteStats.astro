@@ -1,10 +1,11 @@
 ---
+import { getCollection } from "astro:content";
 import { Icon } from "astro-icon/components";
 import WidgetLayout from "@/components/common/WidgetLayout.astro";
 import { siteConfig } from "@/config";
+import { getEnabledMoments } from "@/config/momentsConfig";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import type { WidgetComponentConfig } from "@/types/config";
 import {
 	getCategoryList,
 	getSortedPosts,
@@ -14,20 +15,49 @@ import {
 interface Props {
 	class?: string;
 	style?: string;
-	widgetConfig?: WidgetComponentConfig;
 }
 
-const { class: className, style, widgetConfig } = Astro.props;
-
-const showTitle = widgetConfig?.showTitle !== false;
+const { class: className, style } = Astro.props;
 
 // 从配置中获取站点开始日期
 const siteStartDate = siteConfig.siteStartDate || "2025-01-01";
 
-// 获取所有文章
+// 获取所有内容
 const posts = await getSortedPosts();
 const categories = await getCategoryList();
 const tags = await getTagList();
+const moments = getEnabledMoments();
+const bangumi = await getCollection("bangumi");
+
+// 统计生活记录子分类
+const animeCount = bangumi.filter(
+	(item) => item.data.category === "anime",
+).length;
+const bookCount = bangumi.filter(
+	(item) => item.data.category === "book",
+).length;
+const musicCount = bangumi.filter(
+	(item) => item.data.category === "music",
+).length;
+const gameCount = bangumi.filter(
+	(item) => item.data.category === "game",
+).length;
+
+// 统计生活数据
+const lifeEntries = await getCollection("life");
+const routinesEntries = await getCollection("routines");
+
+// 足迹记录
+const isIn = (entryId: string, folder: string) =>
+	entryId.replace(/\\/g, "/").startsWith(`${folder}/`);
+const placesCount = lifeEntries.filter((entry) =>
+	isIn(entry.id, "places"),
+).length;
+const routinesCount = routinesEntries.length;
+
+// 记录次数 = 影视 + 书籍 + 游戏 + 音乐 + 足迹 + 日常规划
+const recordCount =
+	animeCount + bookCount + gameCount + musicCount + placesCount + routinesCount;
 
 // 计算总字数
 let totalWords = 0;
@@ -53,20 +83,15 @@ function formatNumber(num: number): string {
 	return num.toLocaleString();
 }
 
-// 获取「最后活动」时间：取每篇文章 published 与 updated 中较新的那个，再从全站所有文章里取最大值。这样新发文章和修改老文章都会刷新该字段。
-const getActivityDate = (post: (typeof posts)[number]): Date => {
-	const { published, updated } = post.data;
-	if (updated && updated > published) return updated;
-	return published;
-};
+// 获取最新文章日期（用于客户端计算）
+const latestPost = posts.reduce((latest, post) => {
+	if (!latest) return post;
+	return post.data.published > latest.data.published ? post : latest;
+}, posts[0]);
 
-const lastActivityDate = posts.reduce<Date | null>((latest, post) => {
-	const current = getActivityDate(post);
-	if (!latest || current > latest) return current;
-	return latest;
-}, null);
-
-const lastPostDate = lastActivityDate ? lastActivityDate.toISOString() : null;
+const lastPostDate = latestPost
+	? latestPost.data.published.toISOString()
+	: null;
 
 const todayText = i18n(I18nKey.today);
 
@@ -77,14 +102,24 @@ const stats = [
 		value: posts.length,
 	},
 	{
+		icon: "material-symbols:label-outline",
+		label: i18n(I18nKey.siteStatsTagCount),
+		value: tags.length,
+	},
+	{
+		icon: "material-symbols:edit-note-outline",
+		label: "记录次数",
+		value: recordCount,
+	},
+	{
 		icon: "material-symbols:folder-outline",
 		label: i18n(I18nKey.siteStatsCategoryCount),
 		value: categories.length,
 	},
 	{
-		icon: "material-symbols:label-outline",
-		label: i18n(I18nKey.siteStatsTagCount),
-		value: tags.length,
+		icon: "material-symbols:local-cafe-outline",
+		label: i18n(I18nKey.moments),
+		value: moments.length,
 	},
 	{
 		icon: "material-symbols:text-ad-outline-rounded",
@@ -101,7 +136,7 @@ const stats = [
 		id: "running-days",
 	},
 	{
-		icon: "mingcute:heartbeat-line",
+		icon: "material-symbols:ecg-heart-outline",
 		label: i18n(I18nKey.siteStatsLastUpdate),
 		value: 0, // 将由客户端更新
 		suffix: i18n(I18nKey.siteStatsDaysAgo).replace("{days}", ""),
@@ -111,27 +146,23 @@ const stats = [
 ];
 ---
 
-<WidgetLayout name={i18n(I18nKey.siteStats)} showTitle={showTitle} id="site-stats" class={className} style={style}>
-  <div class="flex flex-col gap-2">
+<WidgetLayout name={i18n(I18nKey.siteStats)} id="site-stats" class={className} style={style}>
+  <div class="site-stats">
     {stats.map((stat) => (
-      <div class="flex items-center justify-between px-3 py-1.5">
-        <div class="flex items-center gap-2.5">
-          <div class="text-(--primary) text-xl">
-            <Icon name={stat.icon} />
-          </div>
-          <span class="text-neutral-700 dark:text-neutral-300 font-medium text-sm">
-            {stat.label}
-          </span>
+      <div class="site-stats__row">
+        <div class="site-stats__icon">
+          <Icon name={stat.icon} />
         </div>
-        <div class="flex items-center">
+        <span class="site-stats__label">{stat.label}</span>
+        <div class="site-stats__value-wrap">
           <span
-            class="text-base font-bold text-neutral-900 dark:text-neutral-100"
+            class="site-stats__value"
             data-stat-id={stat.id}
           >
             {stat.formatted ? formatNumber(stat.value) : stat.value}
           </span>
           {stat.suffix && (
-            <span class="ml-1 text-sm text-neutral-500 dark:text-neutral-400">
+            <span class="site-stats__suffix">
               {stat.suffix}
             </span>
           )}
@@ -140,6 +171,68 @@ const stats = [
     ))}
   </div>
 </WidgetLayout>
+
+<style>
+  .site-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.25rem 0;
+  }
+  .site-stats__row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    transition: background 0.2s;
+  }
+  .site-stats__row:hover {
+    background: var(--moments-soft);
+  }
+  .site-stats__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    color: var(--primary);
+    font-size: 1.125rem;
+  }
+  .site-stats__icon :global(svg) {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+  .site-stats__label {
+    flex: 1;
+    min-width: 0;
+    color: var(--content-meta);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .site-stats__value-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 0.125rem;
+    flex-shrink: 0;
+  }
+  .site-stats__value {
+    color: var(--deep-text);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .site-stats__suffix {
+    color: var(--content-meta);
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+</style>
 
 <script is:inline define:vars={{ siteStartDate, lastPostDate, todayText }}>
   function updateDynamicStats() {
@@ -181,12 +274,8 @@ const stats = [
   // 页面加载时更新
   updateDynamicStats();
 
-  // 防止 Swup 切页重跑脚本时重复注册监听器
-  if (!window.__siteStatsInit) {
-    window.__siteStatsInit = true;
-    // 页面切换时重新更新
-    document.addEventListener("swup:contentReplaced", () => {
-      setTimeout(updateDynamicStats, 100);
-    });
-  }
+  // 页面切换时重新更新
+  document.addEventListener("swup:contentReplaced", () => {
+    setTimeout(updateDynamicStats, 100);
+  });
 </script>

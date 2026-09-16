@@ -1,0 +1,143 @@
+---
+import { Icon } from "astro-icon/components";
+import Markdown from "@/components/common/Markdown.astro";
+import type { MomentItem } from "@/config/momentsConfig";
+import { formatDateToYYYYMMDD } from "@/utils/date-utils";
+
+interface Props {
+	moment: MomentItem;
+}
+
+const { moment } = Astro.props;
+const { author, avatar, published, images, tags, location, pinned, body } =
+	moment;
+
+const publishedDate = new Date(published);
+
+// 相对时间
+const formatTimeAgo = (date: Date): string => {
+	const now = new Date();
+	const diff = now.getTime() - date.getTime();
+	const minutes = Math.floor(diff / 60000);
+	const hours = Math.floor(diff / 3600000);
+	const days = Math.floor(diff / 86400000);
+
+	if (minutes < 1) return "刚刚";
+	if (minutes < 60) return `${minutes} 分钟前`;
+	if (hours < 24) return `${hours} 小时前`;
+	if (days < 30) return `${days} 天前`;
+	return formatDateToYYYYMMDD(date);
+};
+
+// 备用头像（按项目记忆约定的优先级：avatar 字段 → profileConfig.avatar → QQ 头像）
+const fallbackAvatar = "/assets/images/avatar.svg";
+const avatarSrc = avatar || fallbackAvatar;
+const imagesArray = images || [];
+---
+
+<article
+	id={moment.id}
+	class:list={["moment-item", pinned && "is-pinned"]}
+	data-moment-id={moment.id}
+	data-pinned={String(!!pinned)}
+>
+	{/* 左侧头像 */}
+	<div class="moment-avatar">
+		<img
+			src={avatarSrc}
+			alt={author}
+			class="moment-avatar__img"
+			loading="lazy"
+			onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%23999%22><circle cx=%2212%22 cy=%228%22 r=%224%22/><path d=%22M20 21a8 8 0 1 0-16 0%22/></svg>'"
+		/>
+	</div>
+
+	{/* 右侧内容 */}
+	<div class="moment-content">
+		{/* 用户名行 */}
+		<div class="moment-name-row">
+			<span class="moment-name">{author || "匿名"}</span>
+			{pinned && (
+				<span class="moment-pinned-tag">
+					<Icon name="material-symbols:push-pin" class="moment-pinned-tag__icon" />
+					<span>置顶</span>
+				</span>
+			)}
+		</div>
+
+		{/* 时间/地点/设备 */}
+		<div class="moment-meta">
+			<span class="moment-meta__time" title={formatDateToYYYYMMDD(publishedDate)}>
+				<Icon name="material-symbols:schedule-outline-rounded" class="moment-meta__icon" />
+				{formatTimeAgo(publishedDate)}
+			</span>
+			{location && (
+				<span class="moment-meta__location">
+					<Icon name="material-symbols:location-on" class="moment-meta__icon" />
+					{location}
+				</span>
+			)}
+		</div>
+
+		{/* 正文 */}
+		{body && (
+			<div class="moment-text">
+				<Markdown class="moment-text__md">
+					{body}
+				</Markdown>
+			</div>
+		)}
+
+		{/* 图片网格 */}
+		{imagesArray.length > 0 && (
+			<div
+				class="moment-images"
+				data-count={String(imagesArray.length)}
+				data-images={JSON.stringify(imagesArray)}
+			>
+				{imagesArray.slice(0, 9).map((img, index) => (
+					<button
+						type="button"
+						class="moment-image"
+						aria-label={`查看图片 ${index + 1}`}
+						data-image-index={String(index)}
+					>
+						<span class="moment-image__placeholder">
+							<Icon name="material-symbols:image-outline" />
+						</span>
+						<img
+							src={img}
+							alt={`moment image ${index + 1}`}
+							class="moment-image__img"
+							loading="lazy"
+							decoding="async"
+							onload="this.classList.add('is-loaded')"
+						/>
+					</button>
+				))}
+			</div>
+		)}
+
+		{/* 标签：# 由 .moment-tag::before 渲染，文本里不能重复带 # */}
+		{tags && tags.length > 0 && (
+			<div class="moment-tags">
+				{tags.map((tag) => (
+					<span class="moment-tag">{tag.trim().replace(/^#+/, "")}</span>
+				))}
+			</div>
+		)}
+
+		{/* 操作栏 */}
+		<div class="moment-actions">
+			<button
+				type="button"
+				class="moment-action-btn"
+				aria-label="分享"
+				data-moment-id={moment.id}
+			>
+				<Icon name="material-symbols:share" />
+				<span>分享</span>
+			</button>
+		</div>
+	</div>
+</article>

@@ -18,7 +18,7 @@ const recentPosts = posts.slice(0, 6);
                 <div class="inline-flex items-center justify-center w-16 h-16 bg-(--primary) rounded-2xl mb-4">
                     <Icon name="material-symbols:rss-feed" class="text-white text-3xl" />
                 </div>
-                <div class="text-3xl font-bold text-(--primary) mb-3">{i18n(I18nKey.rss)}</div>
+                <h1 class="text-3xl font-bold text-(--primary) mb-3">{i18n(I18nKey.rss)}</h1>
                 <p class="text-75 max-w-2xl mx-auto">
                     {i18n(I18nKey.rssSubtitle)}
                 </p>
@@ -43,7 +43,7 @@ const recentPosts = posts.slice(0, 6);
                     </code>
                     <button 
                         id="copy-rss-btn"
-                        class="px-4 py-2 bg-(--primary) text-white rounded-lg hover:opacity-80 transition-all duration-200 font-medium text-sm whitespace-nowrap"
+                        class="px-4 py-2 bg-(--primary) text-white dark:text-neutral-900 rounded-lg hover:opacity-80 transition-all duration-200 font-medium text-sm whitespace-nowrap"
                         data-url={`${Astro.site}rss.xml`}
                         data-copied-text={i18n(I18nKey.rssCopied)}
                         data-failed-text={i18n(I18nKey.rssCopyFailed)}
@@ -116,26 +116,25 @@ const recentPosts = posts.slice(0, 6);
             copyBtn.parentNode?.replaceChild(newBtn, copyBtn);
             
             // 绑定新的事件监听器
-            newBtn.addEventListener('click', async function (event) {
-                const btn = event.currentTarget as HTMLElement;
-                const url = btn.getAttribute('data-url');
+            newBtn.addEventListener('click', async function() {
+                const url = this.getAttribute('data-url');
                 if (!url) return;
                 try {
                     await navigator.clipboard.writeText(url);
-                    const originalText = btn.textContent;
-                    btn.textContent = btn.getAttribute('data-copied-text') || '';
-                    btn.style.backgroundColor = 'var(--success-color, #10b981)';
-
+                    const originalText = this.textContent;
+                    this.textContent = this.getAttribute('data-copied-text') || '';
+                    this.style.backgroundColor = 'var(--success-color, #10b981)';
+                    
                     setTimeout(() => {
-                        btn.textContent = originalText;
-                        btn.style.backgroundColor = '';
+                        this.textContent = originalText;
+                        this.style.backgroundColor = '';
                     }, 2000);
                 } catch (err) {
-                    console.error("Copy failed:", err);
-                    const originalText = btn.textContent;
-                    btn.textContent = btn.getAttribute('data-failed-text') || '';
+                    console.error('复制失败:', err);
+                    const originalText = this.textContent;
+                    this.textContent = this.getAttribute('data-failed-text') || '';
                     setTimeout(() => {
-                        btn.textContent = originalText;
+                        this.textContent = originalText;
                     }, 2000);
                 }
             });

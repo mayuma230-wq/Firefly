@@ -1,65 +1,34 @@
+/**
+ * Astro 内容集合配置文件
+ *
+ * 功能说明：
+ * 1. 定义所有内容集合的数据结构（Schema）
+ * 2. 每个集合对应 src/content/ 下的一个目录
+ * 3. 使用 Zod 进行数据验证，确保内容格式正确
+ * 4. 支持 Markdown、MDX、JSON、YAML 等多种格式
+ *
+ * 使用方法：
+ * - 新增内容：在对应目录下创建 .md/.mdx/.json 文件，按照 schema 定义填写 frontmatter
+ * - 修改 schema：在对应集合的 schema 中添加/删除字段，需同步更新内容文件
+ * - 新增集合：复制一个集合定义，修改名称、路径和 schema，然后在底部 collections 对象中注册
+ *
+ * 集合说明：
+ * - posts:       博客文章（核心内容）
+ * - spec:        特殊页面（关于、友链、留言板等页面的自定义内容）
+ * - life:        生活记录（规划、足迹等）
+ * - ziyuan:      资源（公告、名言等）
+ * - danmu:       弹幕
+ */
+
 import { defineCollection } from "astro:content";
-import type { CollectionConfig } from "astro/content/config";
 import { glob } from "astro/loaders";
-import { type ZodType, z } from "astro/zod";
+import { z } from "astro/zod";
 
-type PostData = {
-	title: string;
-	published: Date;
-	updated?: Date;
-	draft: boolean;
-	description: string;
-	image: string;
-	tags: string[];
-	category: string | null;
-	lang: string;
-	pinned: boolean;
-	author: string;
-	sourceLink: string;
-	licenseName: string;
-	licenseUrl: string;
-	comment: boolean;
-	password: string;
-	passwordHint: string;
-	series: string;
-	seriesOrder?: number;
-	prevTitle: string;
-	prevSlug: string;
-	nextTitle: string;
-	nextSlug: string;
-};
-
-type DynamicData = {
-	published: Date;
-	pinned: boolean;
-	location: string;
-};
-
-type ProjectLink = {
-	label: string;
-	icon: string;
-	value: string;
-};
-
-type ProjectData = {
-	title: string;
-	published: Date;
-	draft: boolean;
-	order?: number;
-	description: string;
-	image: string;
-	tags: string[];
-	link: ProjectLink[];
-	status: string;
-	lang: string;
-};
-
-type ContentCollection<T> = CollectionConfig<
-	ZodType<T>,
-	ReturnType<typeof glob>
->;
-
-const postsCollection: ContentCollection<PostData> = defineCollection({
+// ============================================================================
+// 博客文章集合 - 网站核心内容
+// 目录：src/content/posts/
+// ============================================================================
+const postsCollection = defineCollection({
 	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/posts" }),
 	schema: z.object({
 		title: z.string(),
@@ -77,67 +46,234 @@ const postsCollection: ContentCollection<PostData> = defineCollection({
 		licenseName: z.string().optional().default(""),
 		licenseUrl: z.string().optional().default(""),
 		comment: z.boolean().optional().default(true),
-		password: z.string().optional().default(""),
-		passwordHint: z.string().optional().default(""),
-		series: z.string().optional().default(""),
-		seriesOrder: z.number().optional(),
+		order: z.number().optional().default(0),
+		password: z.string().optional(),
+		descriptionSource: z.string().optional().default(""),
 
 		/* For internal use */
 		prevTitle: z.string().default(""),
 		prevSlug: z.string().default(""),
 		nextTitle: z.string().default(""),
 		nextSlug: z.string().default(""),
+
+		// 自定义 URL 路径（与文件 ID 解耦，设为有效 slug 时会同时生成 slug 别名路由）
+		slug: z.string().optional().default(""),
 	}),
 });
 
-const specCollection: ContentCollection<Record<string, never>> =
-	defineCollection({
-		loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/spec" }),
-		schema: z.object({}),
-	});
+// ============================================================================
+// 特殊页面集合 - 关于、友链、留言板等页面的自定义内容
+// 目录：src/content/spec/
+// 说明：这些页面的主要内容由组件渲染，此集合用于补充自定义内容
+// ============================================================================
+const specCollection = defineCollection({
+	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/spec" }),
+	schema: z.object({}),
+});
 
-const dynamicCollection: ContentCollection<DynamicData> = defineCollection({
+// ============================================================================
+// 生活记录集合 - 足迹、规划等生活相关内容
+// 目录：src/content/life/
+// 包含：places(足迹), routines(日常规划) 等子目录
+// ============================================================================
+const lifeEntrySchema = z.object({
+	label: z.string().optional().default(""),
+	value: z.string().optional().default(""),
+	title: z.string().optional().default(""),
+	description: z.string().optional().default(""),
+	date: z.coerce.date().optional(),
+	createdAt: z.coerce.date().optional(),
+	completedAt: z.coerce.date().optional(),
+	content: z.string().optional().default(""),
+	status: z.enum(["done", "todo"]).optional(),
+
+	// Notebook
+	name: z.string().optional().default(""),
+	cover: z.string().optional().default(""),
+	summary: z.string().optional().default(""),
+	entries: z.number().optional().default(0),
+	updatedAt: z.union([z.string(), z.date()]).optional(),
+	tags: z.array(z.string()).optional().default([]),
+
+	// Plan
+	planName: z.string().optional().default(""),
+	targetDesc: z.string().optional().default(""),
+	dailyTarget: z.number().optional().default(1),
+	monthlyTarget: z.number().optional().default(20),
+	checkins: z.array(z.coerce.date()).optional().default([]),
+
+	// Place
+	province: z.string().optional().default(""),
+	city: z.string().optional().default(""),
+	experience: z.string().optional().default(""),
+	visitCount: z.number().optional().default(1),
+	lat: z.number().optional(),
+	lng: z.number().optional(),
+	url: z.string().optional().default(""),
+	urlLabel: z.string().optional().default(""),
+	photos: z.array(z.string()).optional().default([]),
+
+	// Legacy fields (keep compatibility with existing data)
+	waterCups: z.number().optional(),
+	meals: z
+		.array(z.object({ name: z.string(), value: z.string() }))
+		.optional()
+		.default([]),
+	streak: z.number().optional().default(0),
+	progress: z.number().min(0).max(100).optional().default(0),
+});
+
+// ============================================================================
+// 生活记录集合 - 足迹、规划、笔记本等生活相关内容
+// 目录：src/content/life/
+// 说明：places(足迹)、routines(日常规划)、notebooks(笔记本) 挂载在同一目录下，
+//       并通过命名集合分别暴露，便于组件按需读取。
+// ============================================================================
+const lifeCollection = defineCollection({
+	loader: glob({ pattern: "**/*.{md,mdx,json}", base: "./src/content/life" }),
+	schema: lifeEntrySchema,
+});
+
+// notebooks 集合：src/content/life/notebooks/（`_index.json` 定义笔记本，其余 .md 为条目）
+const notebooksCollection = defineCollection({
+	loader: glob({
+		pattern: "**/*.{md,mdx,json}",
+		base: "./src/content/life/notebooks",
+	}),
+	schema: lifeEntrySchema,
+});
+
+// routines 集合：src/content/life/routines/
+const routinesCollection = defineCollection({
+	loader: glob({
+		pattern: "**/*.{md,mdx,json}",
+		base: "./src/content/life/routines",
+	}),
+	schema: lifeEntrySchema,
+});
+
+// ============================================================================
+// 资源集合 - 公告、每日名言等站点资源
+// 目录：src/content/ziyuan/
+// 支持两种模式：公告模式（content）和名言模式（quotes）
+// ============================================================================
+const ziyuanCollection = defineCollection({
+	loader: glob({ pattern: "**/*.md", base: "./src/content/ziyuan" }),
+	schema: z.union([
+		z.object({
+			title: z.string(),
+			content: z.string(),
+			closable: z.boolean().optional().default(true),
+			link: z
+				.object({
+					enable: z.boolean().optional().default(true),
+					text: z.string(),
+					url: z.string(),
+					external: z.boolean().optional().default(false),
+				})
+				.optional(),
+			quotes: z.undefined().optional(),
+		}),
+		z.object({
+			title: z.string(),
+			quotes: z.array(
+				z.object({
+					text: z.string(),
+					author: z.string(),
+				}),
+			),
+			content: z.undefined().optional(),
+			closable: z.undefined().optional(),
+			link: z.undefined().optional(),
+		}),
+	]),
+});
+
+// ============================================================================
+// 弹幕集合 - 留言板弹幕效果
+// 目录：src/content/danmu/
+// 用于在留言板页面展示滚动弹幕
+// ============================================================================
+const danmuCollection = defineCollection({
+	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/danmu" }),
+	schema: z.object({
+		nickname: z.string(),
+		time: z.string().optional().default(""),
+	}),
+});
+
+// ============================================================================
+// 番剧/影音/游戏/书籍集合 - 追番追剧、游戏、音乐、读书
+// 目录：src/content/bangumi/
+// 子目录：anime(动漫影视), game(游戏), music(音乐), book(书籍)
+// ============================================================================
+const bangumiCollection = defineCollection({
+	loader: glob({ pattern: "**/*.md", base: "./src/content/bangumi" }),
+	schema: z.object({
+		title: z.string(),
+		category: z.string(),
+		status: z.number().optional().default(0),
+		image: z
+			.union([z.string(), z.object({ src: z.string() })])
+			.optional()
+			.default(""),
+		score: z.number().optional().default(0),
+		tags: z.array(z.string()).optional().default([]),
+		published: z.date().optional(),
+		description: z.string().optional().default(""),
+
+		// 音乐专属字段
+		artist: z.string().optional().default(""),
+		audioUrl: z.string().optional().default(""),
+		lrcUrl: z.string().optional().default(""),
+		metingServer: z.string().optional().default(""),
+		metingId: z.string().optional().default(""),
+
+		// 微信读书专属字段
+		doc_type: z.string().optional(),
+		bookId: z.string().optional(),
+		reviewCount: z.number().optional(),
+		noteCount: z.number().optional(),
+
+		// 其他兼容字段
+		author: z.string().optional().default(""),
+		cover: z.string().optional().default(""),
+		rating: z.number().optional(),
+		link: z.string().optional(),
+	}),
+});
+
+// ============================================================================
+// 动态/说说集合 - 简短动态内容
+// 目录：src/content/dynamic/
+// ============================================================================
+const dynamicCollection = defineCollection({
 	loader: glob({ pattern: "**/*.md", base: "./src/content/dynamic" }),
 	schema: z.object({
 		published: z.date(),
 		pinned: z.boolean().optional().default(false),
-		location: z.string().optional().default(""),
-	}),
-});
-
-const projectsCollection: ContentCollection<ProjectData> = defineCollection({
-	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/projects" }),
-	schema: z.object({
-		title: z.string(),
-		published: z.date(),
-		draft: z.boolean().optional().default(false),
-		order: z.number().optional(),
-		description: z.string().optional().default(""),
-		image: z.string().optional().default(""),
 		tags: z.array(z.string()).optional().default([]),
-		link: z
-			.array(
-				z.object({
-					label: z.string(),
-					icon: z.string().optional().default(""),
-					value: z.string(),
-				}),
-			)
-			.optional()
-			.default([]),
-		status: z.string().optional().default(""),
-		lang: z.string().optional().default(""),
+		location: z.string().optional().default(""),
+		device: z.string().optional().default(""),
+		author: z.string().optional().default(""),
+		avatar: z.string().optional().default(""),
 	}),
 });
 
-export const collections: {
-	dynamic: typeof dynamicCollection;
-	posts: typeof postsCollection;
-	spec: typeof specCollection;
-	projects: typeof projectsCollection;
-} = {
-	dynamic: dynamicCollection,
+/**
+ * 导出所有内容集合
+ *
+ * 注意：集合名称与目录名称对应，在页面中通过 getCollection() 获取内容
+ * 例如：const posts = await getCollection("posts");
+ */
+export const collections = {
 	posts: postsCollection,
 	spec: specCollection,
-	projects: projectsCollection,
+	life: lifeCollection,
+	notebooks: notebooksCollection,
+	routines: routinesCollection,
+	ziyuan: ziyuanCollection,
+	danmu: danmuCollection,
+	bangumi: bangumiCollection,
+	dynamic: dynamicCollection,
 };

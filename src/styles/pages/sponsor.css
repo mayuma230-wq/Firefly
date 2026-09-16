@@ -1,0 +1,350 @@
+/* ============================================
+   赞助页
+   ============================================ */
+
+/* ============================================
+   赞助方式卡片
+   ============================================ */
+
+.sponsor-qr-card__outer {
+	display: block;
+	width: 100%;
+	padding: 1.5rem;
+	border: none;
+	border-radius: var(--radius-large, 0.75rem);
+	background: transparent;
+}
+
+.sponsor-qr-card {
+	position: relative;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+}
+
+/* 标题：❤ 赞助支持 */
+.sponsor-qr-card__header {
+	margin-bottom: 0.5rem;
+}
+
+.sponsor-qr-card__title {
+	font-size: 1.5rem;
+	font-weight: 700;
+	color: var(--neutral-900, #111827);
+	line-height: 1.4;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.sponsor-qr-card__heart {
+	color: #ef4444;
+	font-size: 1.5rem;
+	line-height: 1;
+}
+
+:root.dark .sponsor-qr-card__title {
+	color: var(--neutral-100, #f3f4f6);
+}
+
+/* 描述 */
+.sponsor-qr-card__subtitle {
+	font-size: 0.95rem;
+	color: var(--neutral-600, #4b5563);
+	margin-bottom: 1.25rem;
+	line-height: 1.6;
+}
+
+:root.dark .sponsor-qr-card__subtitle {
+	color: var(--neutral-300, #d1d5db);
+}
+
+/* 三列并排网格 */
+.sponsor-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 1rem;
+}
+
+.sponsor-grid__card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	padding: 1.5rem 1rem 1.25rem;
+	border: 1px solid #e5e5e5;
+	border-radius: 0.5rem;
+	background: #fafafa;
+	transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+:root.dark .sponsor-grid__card {
+	border-color: #3f3f46;
+	background: #27272a;
+}
+
+.sponsor-grid__card:hover {
+	border-color: var(--primary, #4f46e5);
+	transform: translateY(-2px);
+}
+
+.sponsor-grid__head {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-bottom: 0.5rem;
+}
+
+.sponsor-grid__icon {
+	font-size: 1.25rem;
+	color: var(--neutral-900, #111827);
+}
+
+:root.dark .sponsor-grid__icon {
+	color: var(--neutral-100, #f3f4f6);
+}
+
+.sponsor-grid__name {
+	font-size: 1.0625rem;
+	font-weight: 600;
+	color: var(--neutral-900, #111827);
+}
+
+:root.dark .sponsor-grid__name {
+	color: var(--neutral-100, #f3f4f6);
+}
+
+.sponsor-grid__desc {
+	font-size: 0.875rem;
+	color: var(--neutral-500, #6b7280);
+	margin-bottom: 1rem;
+	line-height: 1.5;
+}
+
+:root.dark .sponsor-grid__desc {
+	color: var(--neutral-400, #9ca3af);
+}
+
+/* 二维码容器 */
+.sponsor-grid__qr {
+	width: 100%;
+	max-width: 200px;
+	aspect-ratio: 1 / 1;
+	background: #fff;
+	border: 1px solid #e5e5e5;
+	border-radius: 0.375rem;
+	padding: 0.5rem;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+:root.dark .sponsor-grid__qr {
+	background: #fff;
+	border-color: #e5e5e5;
+}
+
+.sponsor-grid__qr-img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.sponsor-grid__qr--link,
+.sponsor-grid__qr--empty {
+	padding: 0;
+	background: #f5f5f5;
+	border-style: dashed;
+}
+
+:root.dark .sponsor-grid__qr--link,
+:root.dark .sponsor-grid__qr--empty {
+	background: #18181b;
+	border-color: #52525b;
+}
+
+.sponsor-grid__link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	padding: 0.625rem 1.25rem;
+	font-size: 0.9375rem;
+	font-weight: 500;
+	color: var(--primary, #4f46e5);
+	text-decoration: none;
+	border-radius: 0.375rem;
+	transition: background 0.2s;
+}
+
+.sponsor-grid__link:hover {
+	background: color-mix(in srgb, var(--primary, #4f46e5) 10%, transparent);
+}
+
+/* 移动端适配 */
+@media (max-width: 1024px) {
+	.sponsor-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (max-width: 640px) {
+	.sponsor-qr-card__outer {
+		padding: 1rem;
+	}
+
+	.sponsor-qr-card__title {
+		font-size: 1.25rem;
+	}
+
+	.sponsor-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.sponsor-grid__qr {
+		max-width: 220px;
+	}
+}
+
+/* ============================================
+   赞助者列表
+   ============================================ */
+
+.sponsor-list {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 0.625rem;
+}
+
+.sponsor-row {
+	display: flex;
+	align-items: center;
+	padding: 1rem 0.875rem;
+	border-radius: 0.75rem;
+	border: none;
+	transition: background 0.2s ease;
+	background: #fafafa;
+}
+
+:root.dark .sponsor-row {
+	background: #27272a;
+}
+
+.sponsor-row:hover {
+	background: color-mix(in srgb, var(--primary, #4f46e5) 8%, transparent);
+}
+
+.sponsor-avatar {
+	width: 3rem;
+	height: 3rem;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--primary, #4f46e5) 10%, transparent);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-right: 0.625rem;
+	transition: background 0.2s ease;
+}
+
+.sponsor-row:hover .sponsor-avatar {
+	background: color-mix(in srgb, var(--primary, #4f46e5) 20%, transparent);
+}
+
+.sponsor-avatar span {
+	font-size: 1.125rem;
+	font-weight: 700;
+	color: var(--primary, #4f46e5);
+}
+
+.sponsor-avatar__img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: 50%;
+}
+
+.sponsor-info {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+.sponsor-name {
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--neutral-900, #111827);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+:root.dark .sponsor-name {
+	color: var(--neutral-100, #f3f4f6);
+}
+
+.sponsor-date {
+	font-size: 0.7rem;
+	color: var(--neutral-400, #9ca3af);
+	margin-top: 0.25rem;
+}
+
+:root.dark .sponsor-date {
+	color: var(--neutral-500, #6b7280);
+}
+
+.sponsor-amount {
+	flex-shrink: 0;
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--primary, #4f46e5);
+	margin-left: 0.75rem;
+}
+
+/* 平板：两列 */
+@media (max-width: 1024px) {
+	.sponsor-list {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+/* 移动端：单列 */
+@media (max-width: 640px) {
+	.sponsor-list {
+		grid-template-columns: 1fr;
+	}
+
+	.sponsor-row {
+		padding: 0.875rem 0.75rem;
+	}
+
+	.sponsor-avatar {
+		width: 2.75rem;
+		height: 2.75rem;
+		margin-right: 0.625rem;
+	}
+
+	.sponsor-avatar span {
+		font-size: 1rem;
+	}
+
+	.sponsor-name {
+		font-size: 0.9375rem;
+	}
+
+	.sponsor-amount {
+		font-size: 0.9375rem;
+	}
+}
+
+/* 透明模式下使用半透明背景 */
+:global(body.wallpaper-transparent .usage-info-box) {
+	background-color: rgba(var(--primary-rgb, 70, 130, 180), 0.15) !important;
+}
+
+:global(:root.dark body.wallpaper-transparent .usage-info-box) {
+	background-color: oklch(from var(--primary) l c h / 0.15) !important;
+}

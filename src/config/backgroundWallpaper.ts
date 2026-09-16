@@ -1,10 +1,11 @@
-import type { BackgroundWallpaperConfig } from "@/types/backgroundWallpaper";
+import type { BackgroundWallpaperConfig } from "@/types/config";
 
 export const backgroundWallpaper: BackgroundWallpaperConfig = {
-	// 壁纸模式："banner" 横幅壁纸，"fullscreen" 全屏壁纸，"overlay" 覆盖透明，"none" 纯色背景无壁纸
-	mode: "banner",
-	// 是否启用背景视频播放，配置后将在导航栏显示视频播放按钮
-	playerEnable: true,
+	// 壁纸模式："banner" 横幅壁纸，"overlay" 全屏透明，"none" 纯色背景无壁纸,fullscreen 全屏壁纸
+	// 这里可以控制主题色的四种模式的 默认模式
+	mode: "none",
+	// 是否允许用户通过导航栏切换壁纸模式，设为false可提升性能（只渲染当前模式）
+	switchable: true,
 	/**
 	 * 背景图片配置
 	 * 图片路径支持三种格式：
@@ -39,51 +40,40 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 桌面背景图片（支持单张或多张随机）
 		// desktop: "assets/images/DesktopWallpaper/d1.avif",
 		desktop: [
-			"assets/images/DesktopWallpaper/d1.avif",
-			"assets/images/DesktopWallpaper/d2.avif",
-			"assets/images/DesktopWallpaper/d3.avif",
-			"assets/images/DesktopWallpaper/d4.avif",
-			"assets/images/DesktopWallpaper/d5.avif",
-			"assets/images/DesktopWallpaper/d6.avif",
+			// "assets/images/DesktopWallpaper/003.jpeg",
+			// "https://fqzlr.com/img/DesktopWallpaper/003.webp",
+			"/assets/images/home/home.webp",
 		],
 		// 移动背景图片（支持单张或多张随机）
 		// mobile: "assets/images/MobileWallpaper/m1.avif",
 		mobile: [
-			"assets/images/MobileWallpaper/m1.avif",
-			"assets/images/MobileWallpaper/m2.avif",
-			"assets/images/MobileWallpaper/m3.avif",
-			"assets/images/MobileWallpaper/m4.avif",
-			"assets/images/MobileWallpaper/m5.avif",
-			"assets/images/MobileWallpaper/m6.avif",
+			// "assets/images/MobileWallpaper/18188682411036032.jpeg",
+			// "https://fqzlr.com/img/MobileWallpaper/18188682411036032.webp",
+			"/assets/images/home/18188682411036032.webp",
 		],
-		// 背景视频播放地址
-		// 支持单个视频路径（字符串）或多个视频循环（数组，参考上面壁纸配置）
-		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
-		// playerUrl: "/assets/videos/firefly.mp4",
-		playerUrl: "https://bed.twoleaf.cn/file/1785658612716_firefly.mp4",
 	},
-	// 横幅壁纸和全屏壁纸共享配置
-	common: {
-		// 壁纸遮罩暗度，让横幅文字显示更清晰，0-1之间，值越大越暗
-		dimOpacity: 0.2,
-		// 多视频播放模式："order" 顺序循环，"random" 随机切换（仅当 playerUrl 为数组时生效）
-		playerMode: "random",
+	// Banner模式特有配置
+	banner: {
+		// 图片位置
+		// 支持所有CSS object-position值，如: 'top', 'center', 'bottom', 'left top', 'right bottom', '25% 75%', '10px 20px'..
+		// 如果不知道怎么配置百分百之类的配置，推荐直接使用：'center'居中，'top'顶部居中，'bottom' 底部居中，'left'左侧居中，'right'右侧居中
+		position: "0% 20%",
+
 		// 主页横幅文字
 		homeText: {
 			// 是否启用主页横幅文字
 			enable: true,
+			// 是否允许用户通过控制面板切换横幅标题显示
+			switchable: true,
 			// 主页横幅主标题
-			title: "Lovely firefly!",
+			title: "Record more, talk less!",
 			// 主页横幅主标题字体大小
-			titleSize: "4.5rem",
+			titleSize: "3.8rem",
 			// 主页横幅副标题
 			subtitle: [
-				"In Reddened Chrysalis, I Once Rest",
-				"From Shattered Sky, I Free Fall",
-				"Amidst Silenced Stars, I Deep Sleep",
-				"Upon Lighted Fyrefly, I Soon Gaze",
-				"From Undreamt Night, I Thence Shine",
-				"In Finalized Morrow, I Full Bloom",
+				"请耐心做好目前的事吧，上岸是迟早的，潮水退去以后一定会收获到贝壳。",
+				"不要怕，无论什么困难的事，只要硬着头皮去做，就闯过去了。",
+				"你可以不优秀，但不能不努力。",
 			],
 			// 主页横幅副标题字体大小
 			subtitleSize: "1.5rem",
@@ -99,44 +89,38 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 				// 完全显示后的暂停时间（毫秒）
 				pauseTime: 2000,
 			},
-			// 是否显示标题下方的链接图标
-			linksEnable: true,
-			// 首页横幅标题下方的链接图标（可选，支持 showName 显示文字）
-			// 图标支持 Iconify 格式：fa7-brands:github、fa7-solid:envelope、mdi:rss 等
-			links: [
-				{
-					name: "GitHub",
-					icon: "fa7-brands:github",
-					url: "https://github.com/CuteLeaf/Firefly",
-					showName: true,
-				},
-				{
-					name: "Email",
-					icon: "fa7-solid:envelope",
-					url: "mailto:xiaye@msn.com",
-				},
-				{
-					name: "Sponsor",
-					icon: "material-symbols:favorite",
-					url: "https://blog.cuteleaf.cn/sponsor/",
-				},
-				{
-					name: "RSS",
-					icon: "fa7-solid:rss",
-					url: "/rss/",
-				},
-			],
 		},
-		// 壁纸轮播配置，横幅壁纸和全屏壁纸共享，仅在配置多张图片时生效
-		carousel: {
-			// 是否启用壁纸轮播；关闭时保持每次刷新随机显示一张
-			enable: false,
-			// 轮播切换间隔（毫秒）
-			interval: 5000,
-			// 过渡效果: 'fade' 渐变 | 'zoom' 缩放 | 'slide' 滑动 | 'kenburns' 旋转木马
-			transitionEffect: "zoom",
+		// 图片来源
+		credit: {
+			enable: {
+				// 桌面端显示横幅图片来源文本
+				desktop: true,
+				// 移动端显示横幅图片来源文本
+				mobile: true,
+			},
+			text: {
+				// 桌面端要显示的来源文本
+				desktop: "网站浏览量",
+				// 移动端要显示的来源文本
+				mobile: "Pixiv - KiraraShss",
+			},
+			url: {
+				// 桌面端原始艺术品或艺术家页面的 URL 链接
+				desktop: "https://www.pixiv.net/users/108801776",
+				// 移动端原始艺术品或艺术家页面的 URL 链接
+				mobile: "https://www.pixiv.net/users/42715864",
+			},
 		},
-		// 水波纹动画效果配置，开启会影响页面性能，增加内存占用，请根据自己的喜好开启
+		// 横幅导航栏配置
+		navbar: {
+			// 横幅导航栏透明模式："semi" 半透明，"full" 完全透明，"semifull" 动态透明
+			transparentMode: "semifull",
+			// 是否开启毛玻璃模糊效果，开启可能会影响页面性能，如果不开启则是半透明，请根据自己的喜好开启
+			enableBlur: true,
+			// 毛玻璃模糊度
+			blur: 3,
+		},
+		// 水波纹动画效果配置，开启会影响页面性能，请根据自己的喜好开启
 		waves: {
 			enable: {
 				// 桌面端是否启用水波纹动画效果
@@ -144,8 +128,11 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 				// 移动端是否启用水波纹动画效果
 				mobile: true,
 			},
+			// 是否允许用户通过控制面板切换水波纹动画
+			switchable: true,
 		},
-		// 渐变过渡效果配置，当水波纹关闭时自动启用，提供壁纸底部到背景色的平滑过渡
+		// 壁纸底部渐变过渡配置（与水波纹二选一，水波纹开启时自动隐藏）
+		// 从壁纸底部到背景色提供平滑过渡，避免硬边
 		gradient: {
 			enable: {
 				// 桌面端是否启用渐变过渡
@@ -153,64 +140,29 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 				// 移动端是否启用渐变过渡
 				mobile: true,
 			},
-			// 渐变高度
-			height: "10%",
+			// 是否允许用户通过控制面板切换渐变过渡
+			switchable: true,
+			// 渐变区域高度（CSS 值）
+			height: "30vh",
+		},
+		// 壁纸轮播配置
+		carousel: {
+			enable: false,
+			switchable: true,
+			interval: 10000,
 		},
 	},
-	// Banner模式特有配置
-	banner: {
-		// 图片位置
-		// 支持所有CSS object-position值，如: 'top', 'center', 'bottom', 'left top', 'right bottom', '25% 75%', '10px 20px'..
-		// 如果不知道怎么配置百分百之类的配置，推荐直接使用：'center'居中，'top'顶部居中，'bottom' 底部居中，'left'左侧居中，'right'右侧居中
-		position: "0% 20%",
-		// 文章横幅信息："description" 显示描述，"meta" 显示日期、字数和阅读时长
-		postInfo: {
-			mode: "description",
-		},
-		// 导航栏配置
-		navbar: {
-			// 导航栏透明模式："semi" 半透明，"semifull" 动态透明，"none" 纯色不透明
-			transparentMode: "semi",
-			// 毛玻璃模糊度，0 即关闭导航栏的毛玻璃
-			// 注意：导航栏子菜单与浮动面板始终保留毛玻璃，模糊度跟随此项但有最小值
-			blur: 12,
-		},
-	},
-	// 覆盖透明覆盖模式特有配置
+	// 全屏透明覆盖模式特有配置
 	overlay: {
 		// 层级，确保壁纸在背景层
 		zIndex: -1,
-		// 壁纸透明度
-		opacity: 0.8,
-		// 背景模糊度
-		blur: 10,
-		// 卡片透明度，0-1之间，值越小越透明
-		cardOpacity: 0.6,
-	},
-	// 全屏壁纸模式特有配置
-	// 壁纸模糊度(blur)、卡片透明度(cardOpacity)、层级(zIndex) 复用上方 overlay 模式的配置；
-	// 背景透明度(opacity)不适用（全屏壁纸不透明）；导航栏透明模式由 fullscreen.navbar.transparentMode 控制，脱离 banner 的 navbar 配置
-	fullscreen: {
-		// 布局模式："classic" 经典文档流全屏壁纸，"hero" 固定全屏首屏壁纸
-		layout: "classic",
-		// 图片位置
-		position: "center",
-		// 全屏壁纸模式的导航栏配置
-		navbar: {
-			// 导航栏透明模式："semi" 半透明，"semifull" 动态透明（仅首页顶部透明、下滑玻璃化；非首页均跟卡片半透明）
-			transparentMode: "semifull",
-			// 导航栏毛玻璃模糊度，0 即关闭（玻璃态生效）
-			blur: 12,
-		},
-		// 首页下滑时壁纸模糊渐变开关（从 0 渐变为 overlay.blur 的最大模糊）
-		// 关闭后该设备上全屏壁纸保持清晰（首页与非首页都不模糊），设置面板的模糊度滑块也会隐藏
-		blurRamp: {
-			enable: {
-				// 桌面端是否启用模糊渐变
-				desktop: true,
-				// 移动端是否启用模糊渐变
-				mobile: true,
-			},
-		},
+		// 壁纸透明度（0-100）
+		opacity: 80,
+		// 背景模糊程度（px）
+		blur: 0,
+		// 卡片透明度（0-100）
+		cardOpacity: 99,
+		// 是否允许用户通过控制面板切换全屏透明模式
+		switchable: true,
 	},
 };

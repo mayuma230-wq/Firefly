@@ -4,7 +4,6 @@ export const sortDynamics = (
 	entries: CollectionEntry<"dynamic">[],
 ): CollectionEntry<"dynamic">[] =>
 	entries.sort((a, b) => {
-		// 置顶优先，然后按发布时间降序
 		if (a.data.pinned && !b.data.pinned) return -1;
 		if (!a.data.pinned && b.data.pinned) return 1;
 		return b.data.published.getTime() - a.data.published.getTime();
@@ -26,7 +25,4 @@ export const dynamicPlainText = (entry: CollectionEntry<"dynamic">): string =>
 		.trim();
 
 export const dynamicSearchText = (entry: CollectionEntry<"dynamic">): string =>
-	[dynamicPlainText(entry), entry.data.location]
-		.filter(Boolean)
-		.join(" ")
-		.toLocaleLowerCase();
+	dynamicPlainText(entry).toLocaleLowerCase();

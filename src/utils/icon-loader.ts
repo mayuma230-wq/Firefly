@@ -3,9 +3,7 @@
  * 负责处理图标的加载状态显示
  */
 
-let bodyObserver: MutationObserver | null = null;
-
-export function initIconLoader(): void {
+export function initIconLoader() {
 	// 初始化单个图标容器
 	function initContainer(container: Element) {
 		if (container.hasAttribute("data-icon-initialized")) return;
@@ -96,8 +94,7 @@ export function initIconLoader(): void {
 	// 初始化页面上现有的图标
 	document.querySelectorAll("[data-icon-container]").forEach(initContainer);
 
-	// 复用单个 body observer，避免 Swup 切页重复调用 initIconLoader 时累积多个 observer
-	bodyObserver?.disconnect();
+	// 监听新添加的图标
 	if (window.MutationObserver) {
 		const observer = new MutationObserver((mutations) => {
 			mutations.forEach((mutation) => {
@@ -120,6 +117,5 @@ export function initIconLoader(): void {
 			childList: true,
 			subtree: true,
 		});
-		bodyObserver = observer;
 	}
 }

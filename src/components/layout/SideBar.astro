@@ -4,26 +4,39 @@ import Advertisement from "@/components/widget/Advertisement.astro";
 import Announcement from "@/components/widget/Announcement.astro";
 import Calendar from "@/components/widget/Calendar.astro";
 import Categories from "@/components/widget/Categories.astro";
-import Dynamic from "@/components/widget/Dynamic.astro";
+import EditPostButtonSvelte from "@/components/widget/EditPostButton.svelte";
+import LifeStats from "@/components/widget/LifeStats.astro";
 import Music from "@/components/widget/Music.astro";
+import PostDirectory from "@/components/widget/PostDirectory.astro";
 import Profile from "@/components/widget/Profile.astro";
+import QuoteOfTheDay from "@/components/widget/QuoteOfTheDay.astro";
+import RecentItems from "@/components/widget/RecentItems.astro";
+import RelationshipTimer from "@/components/widget/RelationshipTimer.astro";
 import SidebarTOC from "@/components/widget/SidebarTOC.astro";
-import SiteInfo from "@/components/widget/SiteInfo.astro";
+import SiteHeatmap from "@/components/widget/SiteHeatmap.astro";
 import SiteStats from "@/components/widget/SiteStats.astro";
+import SiteVisitCounter from "@/components/widget/SiteVisitCounter.astro";
 import Tags from "@/components/widget/Tags.astro";
 import { sidebarLayoutConfig } from "@/config";
 import type {
 	MobileBottomComponentConfig,
 	WidgetComponentConfig,
+	WidgetComponentType,
 } from "@/types/config";
-import { isWidgetVisibleOnPageType } from "@/utils/responsive-utils";
-import { isArticleDetailPage } from "@/utils/url-utils";
 
 interface Props {
 	class?: string;
 	headings?: MarkdownHeading[];
-	encrypted?: boolean;
 	side?: "left" | "right" | "bottom";
+	postSlug?: string;
+	/**
+	 * 容器 DOM id 前缀（默认取 side 值）。
+	 * 首页 HomeDigest 等自建布局需传入独立值，
+	 * 避免与全局侧边栏 id 冲突或被 .lg:is-home 隐藏规则误伤。
+	 */
+	domId?: string;
+	/** 需要从该侧组件列表中排除的组件类型（如首页左栏不需要 editPostButton） */
+	excludeTypes?: WidgetComponentType[];
 }
 
 // 侧边栏位置常量
@@ -48,14 +61,20 @@ const componentMap = {
 	announcement: Announcement,
 	categories: Categories,
 	tags: Tags,
+	postDirectory: PostDirectory,
 	sidebarToc: SidebarTOC,
+	editPostButton: EditPostButtonSvelte as any,
 	advertisement: Advertisement,
 	stats: SiteStats,
 	calendar: Calendar,
 	music: Music,
-	siteInfo: SiteInfo,
-	dynamic: Dynamic,
-};
+	relationship: RelationshipTimer,
+	recentItems: RecentItems,
+	lifeStats: LifeStats,
+	siteHeatmap: SiteHeatmap,
+	quoteOfTheDay: QuoteOfTheDay,
+	siteVisitCounter: SiteVisitCounter as any,
+} satisfies Record<WidgetComponentType, any>;
 
 // 获取侧边栏位置
 const side = (Astro.props.side ||
@@ -79,11 +98,14 @@ const getComponents = (): (
 	return [];
 };
 
-// 过滤并排序组件（不再进行 showOnPostPage 过滤，交由客户端处理）
+// 过滤组件：仅按 enable 过滤；再按调用方的 excludeTypes 排除
+// showOnPostPage / showOnNonPostPage 由客户端 JS 通过 CSS class 控制显隐
+// 这样可以确保 Swup 导航时所有 widget 都在 DOM 中，不会因静态容器不刷新而消失
 const filterAndSortComponents = (
 	components: (WidgetComponentConfig | MobileBottomComponentConfig)[],
 ) => {
-	return components.filter((comp) => comp.enable);
+	const excluded = new Set<WidgetComponentType>(Astro.props.excludeTypes ?? []);
+	return components.filter((comp) => comp.enable && !excluded.has(comp.type));
 };
 
 // 分离 top 和 sticky 位置的组件（保持原始数组顺序）
@@ -104,14 +126,8 @@ const getAnimationDelay = (index: number): string => {
 	return `${index * ANIMATION_DELAY_UNIT}ms`;
 };
 
-// 判断当前页面是否为文章/项目详情页（服务端渲染时确定）
-const isPostPage = isArticleDetailPage(Astro.url.pathname);
-
-// 判断组件在当前页面首屏是否可见（用于计算布局间距，避免隐藏组件占位）
-// 谓词与列几何共用 isWidgetVisibleOnPageType，避免两处规则漂移
-const isComponentInitiallyVisible = (
-	config: WidgetComponentConfig | MobileBottomComponentConfig,
-): boolean => isWidgetVisibleOnPageType(config, isPostPage);
+// 判断当前页面是否为文章页面（服务端渲染时确定）
+const isPostPage = Astro.url.pathname.includes("/posts/");
 
 // 动态构建组件 props
 const getComponentProps = (
@@ -119,12 +135,11 @@ const getComponentProps = (
 	index: number,
 ): Record<string, unknown> => {
 	const baseProps: Record<string, unknown> = {
-		class: "onload-animation",
+		class: "onload-animation widget-card",
 		style: `animation-delay: ${getAnimationDelay(index)}`,
-		widgetConfig: config,
 	};
 
-	// 添加 showOnPostPage 和 hideOnNonPostPage 标记class（仅WidgetComponentConfig有这些属性）
+	// 添加 showOnPostPage 和 showOnNonPostPage 标记class（仅WidgetComponentConfig有这些属性）
 	// 同时根据当前页面类型在服务端渲染时设置初始 hidden 状态，避免页面加载时闪烁
 	if ("showOnPostPage" in config && config.showOnPostPage === false) {
 		baseProps.class = `${baseProps.class} widget-hide-on-post`;
@@ -132,7 +147,7 @@ const getComponentProps = (
 			baseProps.class = `${baseProps.class} hidden`;
 		}
 	}
-	if ("hideOnNonPostPage" in config && config.hideOnNonPostPage === true) {
+	if ("showOnNonPostPage" in config && config.showOnNonPostPage === false) {
 		baseProps.class = `${baseProps.class} widget-hide-on-non-post`;
 		if (!isPostPage) {
 			baseProps.class = `${baseProps.class} hidden`;
@@ -144,8 +159,27 @@ const getComponentProps = (
 		return {
 			...baseProps,
 			headings: Astro.props.headings || [],
-			encrypted: Astro.props.encrypted || false,
+			postSlug: Astro.props.postSlug,
 		};
+	}
+
+	// 特殊处理 PostDirectory 组件（全部文章目录）
+	if (config.type === "postDirectory") {
+		return { ...baseProps, currentSlug: Astro.props.postSlug };
+	}
+
+	// 特殊处理 EditPostButton 组件
+	if (config.type === "editPostButton") {
+		return { ...baseProps, postSlug: Astro.props.postSlug };
+	}
+
+	// 特殊处理 Advertisement 组件
+	if (
+		config.type === "advertisement" &&
+		"configId" in config &&
+		config.configId
+	) {
+		return { ...baseProps, configId: config.configId };
 	}
 
 	return baseProps;
@@ -154,6 +188,7 @@ const getComponentProps = (
 // 获取所有需要渲染的组件
 const allComponents = getComponents();
 const filteredComponents = filterAndSortComponents(allComponents);
+const domPrefix = Astro.props.domId ?? side;
 
 // 对于移动端底部组件，直接使用所有组件，不进行position分组
 const isMobileBottom = side === SIDEBAR_SIDE.BOTTOM;
@@ -161,14 +196,11 @@ const { topComponents, stickyComponents } = !isMobileBottom
 	? getComponentsByPosition(filteredComponents)
 	: { topComponents: [], stickyComponents: [] };
 const bottomComponents = isMobileBottom ? filteredComponents : [];
-const hasInitiallyVisibleTopComponents = topComponents.some(
-	isComponentInitiallyVisible,
-);
 ---
 
 {
 	(topComponents.length > 0 || stickyComponents.length > 0 || bottomComponents.length > 0) && (
-		<div id={`${side}-sidebar`} class:list={[className, "flex flex-col w-full pt-0"]}>
+		<div id={`${domPrefix}-sidebar`} class:list={[className, "flex flex-col w-full pt-0"]}>
 			{/* Mobile bottom components - 直接渲染所有组件，不分组 */}
 			{isMobileBottom ? (
 				<div class="flex flex-col w-full gap-4">
@@ -176,24 +208,24 @@ const hasInitiallyVisibleTopComponents = topComponents.some(
 						const Component = componentMap[comp.type];
 						if (!Component) return null;
 						const props = getComponentProps(comp, index) as any;
-						return <Component {...props} />;
+						const { class: compClass, style: compStyle, ...restProps } = props as any; return <div class={compClass} style={compStyle}><Component {...restProps} /></div>;
 					})}
 				</div>
 			) : (
 				<>
 					{/* Top components */}
 					{topComponents.length > 0 && (
-						<div
-							class:list={[
-								"flex flex-col w-full gap-4",
-								hasInitiallyVisibleTopComponents && "mb-4",
-							]}
-						>
+						<div class="flex flex-col w-full gap-4 mb-4">
 							{topComponents.map((comp, index) => {
+								if (comp.type === "editPostButton") {
+									const props = getComponentProps(comp, index) as any;
+									const { class: compClass, style: compStyle, ...restProps } = props as any;
+									return <div class={compClass} style={compStyle}><EditPostButtonSvelte client:load {...restProps} /></div>;
+								}
 								const Component = componentMap[comp.type];
 								if (!Component) return null;
 								const props = getComponentProps(comp, index) as any;
-								return <Component {...props} />;
+								const { class: compClass, style: compStyle, ...restProps } = props as any; return <div class={compClass} style={compStyle}><Component {...restProps} /></div>;
 							})}
 						</div>
 					)}
@@ -201,21 +233,29 @@ const hasInitiallyVisibleTopComponents = topComponents.some(
 					{/* Sticky components */}
 					{stickyComponents.length > 0 && (
 						<div
-							id={`${side}-sidebar-sticky`}
+							id={`${domPrefix}-sidebar-sticky`}
 							class:list={[
-								"flex flex-col w-full mt-0 gap-4",
+								"transition-all duration-700 flex flex-col w-full mt-0",
 								"sticky",
-								hasInitiallyVisibleTopComponents ? "top-4" : "top-0",
+								topComponents.length > 0 ? "top-4 gap-4" : "top-0",
 							]}
 						>
 							{stickyComponents.map((comp, index) => {
+								if (comp.type === "editPostButton") {
+									const props = getComponentProps(
+										comp,
+										topComponents.length + index
+									) as any;
+									const { class: compClass, style: compStyle, ...restProps } = props as any;
+									return <div class={compClass} style={compStyle}><EditPostButtonSvelte client:load {...restProps} /></div>;
+								}
 								const Component = componentMap[comp.type];
 								if (!Component) return null;
 								const props = getComponentProps(
 									comp,
 									topComponents.length + index
 								) as any;
-								return <Component {...props} />;
+								const { class: compClass, style: compStyle, ...restProps } = props as any; return <div class={compClass} style={compStyle}><Component {...restProps} /></div>;
 							})}
 						</div>
 					)}

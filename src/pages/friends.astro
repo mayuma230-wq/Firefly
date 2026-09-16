@@ -1,22 +1,20 @@
----
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿---
 import { getEntry, render } from "astro:content";
 import Comment from "@components/comment/index.astro";
 import Markdown from "@components/common/Markdown.astro";
 import { Icon } from "astro-icon/components";
-import {
-	commentConfig,
-	friendsPageConfig,
-	getEnabledFriends,
-	siteConfig,
-} from "@/config";
-import I18nKey from "@/i18n/i18nKey";
-import { i18n } from "@/i18n/translation";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
-
-// 检查页面是否启用
-if (!siteConfig.pages.friends) {
-	return Astro.redirect("/404/");
-}
+import FriendCard from "@components/features/FriendCard.astro";
+import FriendRulesModal from "@components/features/FriendRulesModal.astro";
+import FriendFailWindow from "@components/features/FriendFailWindow.astro";
+import FriendFailTombstone from "@components/features/FriendFailTombstone.astro";
+import FriendsMagicLink from "@components/features/FriendsMagicLink.astro";
+import FriendsMagicPortal from "@components/features/FriendsMagicPortal.astro";
+import { friendsPageConfig, getEnabledFriends, commentConfig } from "@/config";
+import FriendsEditor from "@/components/edit/FriendsEditor.svelte";
+import I18nKey from "@i18n/i18nKey";
+import { i18n } from "@i18n/translation";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import PageHeader from "@/components/common/PageHeader.astro";
 
 const friendsPost = await getEntry("spec", "friends");
 
@@ -26,20 +24,57 @@ if (!friendsPost) {
 
 const { Content } = await render(friendsPost);
 
+// 从 friendsConfig.ts 读取友链数据
+const items = getEnabledFriends();
+
+// 用于判断「站长」卡：当前站点的 siteurl（去 www、去尾斜杠）
+const ownSiteUrl = (() => {
+  const raw = friendsPageConfig?.siteInfo?.url || "";
+  return raw
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/\/+$/, "")
+    .toLowerCase();
+})();
+const normalizeFriendUrl = (url: string) =>
+  (url || "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/\/+$/, "")
+    .toLowerCase();
+
+// 生成 inline JSON（完整字段），供失效分区客户端脚本按 fail_count 分组渲染
+const friendListForInline = JSON.stringify(
+	items.map((it) => ({
+		name: it.title,
+		link: it.siteurl,
+		avatar: it.imgurl,
+		desc: it.desc || "",
+		siteshot: it.siteshot || "",
+	}))
+);
+
+const allTags = [
+	...new Set(items.flatMap((item) => item.tags || [])),
+].sort();
+
 // 检查评论系统是否启用
 const isCommentEnabled =
 	commentConfig?.type &&
 	commentConfig.type !== "none" &&
 	friendsPageConfig.showComment !== false;
 
-// 使用配置文件中的友链数据，按权重排序
-const items = getEnabledFriends();
-const allTags = [...new Set(items.flatMap((item) => item.tags || []))].sort();
-
 // 页面标题和描述
-const title = friendsPageConfig.title || i18n(I18nKey.friends);
-const description =
-	friendsPageConfig.description || i18n(I18nKey.friendsDescription);
+const title = i18n(I18nKey.friends);
+const description = i18n(I18nKey.friendsDescription);
+
+// 本站信息整合文本（一键复制）
+const _si = friendsPageConfig.siteInfo;
+const siteInfoText = _si
+	? `Hi~我已加贵站了，现在申请一下友链！\n\n{\n    title: "${_si.name}",\n    imgurl: "${_si.avatar}",\n    desc: "${_si.desc}",\n    siteurl: "${_si.url}",\n    tags: ["Blog"],\n}`
+	: "";
 ---
 
 <MainGridLayout title={title} description={description}>
@@ -47,169 +82,185 @@ const description =
     class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32"
   >
     <div class="card-base z-10 px-9 py-6 relative w-full">
-      <!-- 页面标题和描述 -->
-      <div class="mb-4">
-        <div class="flex items-center gap-3 mb-3">
-          <div
-            class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70"
-          >
-            <Icon name="material-symbols:group" class="text-[1.5rem]" />
-          </div>
-          <div class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
-            {title}
-          </div>
-        </div>
+      <!-- 页面页头：面包屑 + 标题 + 右侧操作 slot（友链申请按钮） -->
+      <PageHeader
+        title={title}
+        eyebrow="Friends"
+        variant="stacked"
+        breadcrumbs={[{ name: title, icon: "material-symbols:group" }]}
+      >
         {
-          description && (
-            <p class="text-base text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
-              {description}
-            </p>
-          )
+          /* 页头右侧：如何申请友链（左） + 视图切换神奇按钮（右，原申请按钮位置） */
         }
+        <div class="friend-header-toolbar w-full flex justify-end items-center gap-2.5">
+          {friendsPageConfig.applyLink && (
+            <button
+              data-open-friend-rules
+              class="friend-toolbar-pill"
+            >
+              <Icon name="material-symbols:help-outline-rounded" class="text-base" />
+              如何申请友链
+            </button>
+          )}
+          <!-- 视图切换按钮：与申请友链按钮同族药丸样式 -->
+          <button
+            type="button"
+            id="friend-view-toggle"
+            data-expanded="false"
+            aria-controls="friends-grid"
+            aria-expanded="false"
+            class="friend-toolbar-pill friend-view-toggle"
+          >
+            <span data-view-toggle-label>简洁视图</span>
+            <Icon
+              name="material-symbols:expand-more-rounded"
+              class="text-base transition-transform duration-200"
+            />
+          </button>
+          <!-- 神奇按钮（复刻 Aemeath）：原「如何申请友链」位置（最右），打开友链漫游舱 -->
+          <FriendsMagicLink />
+        </div>
+      </PageHeader>
+
+      <!-- 友链编辑器 -->
+      <div data-no-swup>
+        <FriendsEditor client:load />
       </div>
 
-      <!-- 搜索框 -->
+      <!-- 标签筛选 -->
       {
         items.length > 0 && (
-          <friend-filter class="mb-6">
-            <div class="relative mb-3">
-              <Icon
-                name="material-symbols:search"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500 text-lg pointer-events-none"
-              />
-              <input
-                type="text"
-                data-search
-                placeholder={i18n(I18nKey.searchFriends) || "搜索友链..."}
-                class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-(--line-divider) bg-transparent text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:border-(--primary) focus:ring-1 focus:ring-(--primary) outline-none transition-all duration-200 text-sm"
-              />
-            </div>
-            <div class="flex flex-wrap gap-2">
+          <friend-filter class="flex flex-wrap gap-2 mb-6">
+            <button
+              data-tag="all"
+              class="btn-regular px-3 py-1.5 rounded-lg bg-(--primary) text-white dark:text-neutral-900 hover:bg-(--primary) transition-colors duration-200 text-sm font-medium"
+            >
+              {i18n(I18nKey.all)}
+            </button>
+            {allTags.map((tag) => (
               <button
-                data-tag="all"
-                class="category-pill px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-200"
-                data-active
+                data-tag={tag}
+                class="btn-regular px-3 py-1.5 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) hover:bg-(--btn-regular-bg-hover) transition-colors duration-200 text-sm font-medium"
               >
-                {i18n(I18nKey.all)}
+                {tag}
               </button>
-              {allTags.map((tag) => (
-                <button
-                  data-tag={tag}
-                  class="category-pill px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-200"
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
+            ))}
           </friend-filter>
         )
       }
 
-      <div class="friends-grid my-4">
+      <!-- 友链网格（data-view 由视图切换脚本控制：screenshot / compact） -->
+      <div class="friends-grid" id="friends-grid" data-view="screenshot">
+        <div class="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 my-4">
         {
-          items.length === 0 && (
-            <div class="col-span-full flex flex-col items-center justify-center py-12 text-neutral-400 dark:text-neutral-500">
-              <Icon name="material-symbols:group-off-outline" class="text-4xl mb-3" />
-              <div class="text-sm">{i18n(I18nKey.friendsEmpty)}</div>
-            </div>
-          )
-        }
-        {
-          items.map((item) => (
-            <a
-              href={item.siteurl}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-tags={item.tags?.join(",")}
-              class="friend-card group flex items-center gap-3 p-2.5 rounded-xl border border-(--line-divider) hover:border-(--primary) hover:bg-(--card-bg) transition-all duration-300 hover:shadow-lg relative overflow-hidden"
-            >
-              {/* 背景装饰 - 仅悬停显示 */}
-              <div class="absolute inset-0 bg-(--primary) opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none" />
-
-              {/* 外部链接图标 - 固定在卡片右上角 */}
-              <Icon
-                name="material-symbols:arrow-outward-rounded"
-                class="absolute top-3 right-3 text-(--primary) text-lg opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300"
+          items.map((item) => {
+            const isOwn = Boolean(ownSiteUrl) && normalizeFriendUrl(item.siteurl) === ownSiteUrl;
+            const isRecommended = !isOwn && item.recommended === true;
+            return (
+            <div class="friend-card" data-friend-id={item.siteurl} data-tags={item.tags?.join(",")}>
+              <FriendCard
+                title={item.title}
+                href={item.siteurl}
+                imgurl={item.imgurl}
+                desc={item.desc}
+                tags={item.tags}
+                siteshot={item.siteshot || ""}
+                isOwn={isOwn}
+                isRecommended={isRecommended}
               />
-
-              {/* 头像 */}
-              <div class="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-black/5 dark:border-white/5 group-hover:scale-105 transition-transform duration-300">
-                <img
-                  src={item.imgurl}
-                  alt={item.title}
-                  class="w-full h-full object-cover"
-                />
-              </div>
-
-              {/* 内容 */}
-              <div class="grow min-w-0 flex flex-col justify-center gap-0.5">
-                <div class="font-bold text-base text-neutral-900 dark:text-neutral-100 group-hover:text-(--primary) transition-colors truncate pr-4">
-                  {item.title}
-                </div>
-
-                <div
-                  class="text-sm text-neutral-500 dark:text-neutral-400 line-clamp-1"
-                  title={item.desc}
-                >
-                  {item.desc}
-                </div>
-
-                {/* 标签 */}
-                <div class="flex flex-wrap gap-1 mt-1">
-                  {item.tags && item.tags.length > 0
-                    ? item.tags
-                        .slice(0, 3)
-                        .map((tag) => (
-                          <span class="text-[0.65rem] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 transition-colors duration-300">
-                            {tag}
-                          </span>
-                        ))
-                    : null}
-                </div>
-              </div>
-            </a>
-          ))
+            </div>
+            );
+          })
         }
+        </div>
       </div>
 
-      {/* 搜索无结果提示 */}
-      <div class="friends-empty hidden flex-col items-center justify-center py-12 text-neutral-400 dark:text-neutral-500">
-        <Icon name="material-symbols:search-off-rounded" class="text-4xl mb-3" />
-        <div class="text-sm">{i18n(I18nKey.searchNoResults)}</div>
-      </div>
+      <!-- 失效暂留 + 友链墓碑（客户端拉 check-flink result.json 后按 fail_count 分组） -->
+      <FriendFailWindow />
+      <FriendFailTombstone />
+
+      <Markdown class="mt-2">
+        <Content />
+      </Markdown>
+
+      <!-- 友链申请指南：左侧本站信息 + 右侧注意事项 -->
+      <section class="flink-guide mt-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+          <!-- 左侧：本站信息（单卡片 + 一键复制） -->
+          {siteInfoText && (
+            <div class="min-w-0 flex flex-col">
+              <h3 class="flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-neutral-200 mb-2.5">
+                <span class="flink-guide-dot bg-(--primary)"></span>
+                本站信息
+              </h3>
+              <div class="flink-panel-card flex-1">
+                <button
+                  class="flink-copy-btn flink-panel-copy"
+                  data-copy={siteInfoText}
+                  aria-label="复制全部信息"
+                  title="一键复制"
+                >
+                  <Icon name="material-symbols:content-copy-outline-rounded" class="flink-copy-icon" />
+                  <Icon name="material-symbols:check-rounded" class="flink-check-icon" />
+                </button>
+                <pre class="flink-code-text">{siteInfoText}</pre>
+              </div>
+            </div>
+          )}
+
+          <!-- 右侧：注意事项（卡片形式） -->
+          {friendsPageConfig.notes && friendsPageConfig.notes.length > 0 && (
+            <div class="min-w-0 flex flex-col">
+              <h3 class="flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-neutral-200 mb-2.5">
+                <span class="flink-guide-dot bg-amber-500"></span>
+                注意事项
+              </h3>
+              <div class="flink-panel-card flex-1">
+                <div class="flex flex-col gap-1.5">
+                  {friendsPageConfig.notes.map((item) => (
+                    <div class="flex items-start gap-2 text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                      <span class="flink-note-dot mt-1.5"></span>
+                      <p><strong class="text-neutral-800 dark:text-neutral-200">{item.title}</strong>：{item.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   </div>
 
-  {friendsPageConfig.showCustomContent !== false && (
-    <div class="mt-4 card-base z-10 px-9 py-6 relative w-full">
-      <Markdown class="">
-        <Content />
-      </Markdown>
-    </div>
-  )}
-
   <!-- 评论区 -->
-  {isCommentEnabled && (
-    <div class="mt-4">
-      <Comment post={friendsPost} customPath="/friends/" />
-    </div>
-  )}
+  <div class="mt-4 relative" id="post-comments">
+    {isCommentEnabled && (
+      <button
+        id="flink-import-template-btn"
+        class="absolute -top-1 right-2 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-xs font-medium hover:opacity-85 transition-opacity cursor-pointer"
+      >
+        <Icon name="material-symbols:drive-folder-upload-outline" class="text-sm" />
+        一键导入模板
+      </button>
+    )}
+    <Comment post={friendsPost} customPath="/friends/" />
+  </div>
+
+  <!-- 友链申请指南弹窗 -->
+  <FriendRulesModal applyLink={friendsPageConfig.applyLink} commentEnabled={isCommentEnabled} />
+
+  <!-- 友链漫游舱（神奇按钮打开，three.js 全屏隧道） -->
+  <FriendsMagicPortal items={items} />
 
   <script slot="head" is:inline>
     if (!customElements.get("friend-filter")) {
       class FriendFilter extends HTMLElement {
-        selectedTag = "all";
-
         constructor() {
           super();
         }
 
         connectedCallback() {
           this.addEventListener("click", this.handleClick);
-          const input = this.querySelector("[data-search]");
-          if (input) {
-            input.addEventListener("input", () => this.applyFilters());
-          }
         }
 
         disconnectedCallback() {
@@ -221,68 +272,917 @@ const description =
           const button = target.closest("button");
           if (!button) return;
 
-          this.selectedTag = button.dataset.tag;
+          const selectedTag = button.dataset.tag;
           const filters = this.querySelectorAll("button");
-
-          filters.forEach((f) => {
-            f.removeAttribute("data-active");
-          });
-          button.setAttribute("data-active", "");
-
-          this.applyFilters();
-        }
-
-        applyFilters() {
           const container = this.closest(".card-base");
           if (!container) return;
 
-          const input = this.querySelector("[data-search]");
-          const query = (input?.value || "").toLowerCase().trim();
           const cards = container.querySelectorAll(".friend-card");
 
-          let hasVisible = false;
+          filters.forEach((f) => {
+            f.classList.remove("bg-(--primary)", "text-white", "dark:text-neutral-900");
+            f.classList.remove("hover:bg-(--primary)");
+            f.classList.add(
+              "bg-(--btn-regular-bg)",
+              "text-(--btn-content)"
+            );
+            f.classList.add("hover:bg-(--btn-regular-bg-hover)");
+
+            if (f === button) {
+              f.classList.remove(
+                "bg-(--btn-regular-bg)",
+                "text-(--btn-content)"
+              );
+              f.classList.remove("hover:bg-(--btn-regular-bg-hover)");
+              f.classList.add("bg-(--primary)", "text-white", "dark:text-neutral-900");
+              f.classList.add("hover:bg-(--primary)");
+            }
+          });
 
           cards.forEach((card) => {
             const cardEl = card;
             const tags = (cardEl.dataset.tags || "").split(",");
-            const name = (cardEl.querySelector(".font-bold")?.textContent || "").toLowerCase();
-            const desc = (cardEl.querySelector(".line-clamp-1")?.textContent || "").toLowerCase();
-
-            const tagMatch =
-              this.selectedTag === "all" ||
-              (this.selectedTag && tags.includes(this.selectedTag));
-            const searchMatch =
-              !query ||
-              name.includes(query) ||
-              desc.includes(query) ||
-              tags.some((t) => t.toLowerCase().includes(query));
-
-            if (tagMatch && searchMatch) {
+            if (
+              selectedTag === "all" ||
+              (selectedTag && tags.includes(selectedTag))
+            ) {
               cardEl.style.display = "";
               cardEl.classList.add("animate-fade-in-up");
-              hasVisible = true;
             } else {
               cardEl.style.display = "none";
               cardEl.classList.remove("animate-fade-in-up");
             }
           });
-
-          const emptyEl = container.querySelector(".friends-empty");
-          if (emptyEl) {
-            emptyEl.classList.toggle("hidden", hasVisible);
-            emptyEl.classList.toggle("flex", !hasVisible);
-          }
         }
       }
       customElements.define("friend-filter", FriendFilter);
     }
+
+    // 友链申请指南 - 复制按钮
+    function initFlinkCopyButtons() {
+      document.querySelectorAll(".flink-copy-btn").forEach((btn) => {
+        if (btn.dataset.copyInit) return;
+        btn.dataset.copyInit = "1";
+        btn.addEventListener("click", () => {
+          const text = btn.getAttribute("data-copy") || "";
+          navigator.clipboard.writeText(text).then(() => {
+            btn.classList.add("copied");
+            setTimeout(() => btn.classList.remove("copied"), 1500);
+          });
+        });
+      });
+    }
+
+    // 一键导入友链模板到评论区
+    function initFlinkImportTemplate() {
+      const btn = document.getElementById("flink-import-template-btn");
+      if (!btn || btn.dataset.importInit) return;
+      btn.dataset.importInit = "1";
+      btn.addEventListener("click", () => {
+        const template = 'Hi~我已加贵站了，现在申请一下友链！\n\n{\n    title: "站点名称",\n    imgurl: "头像链接",\n    desc: "站点描述",\n    siteurl: "站点链接",\n    linkpage: "友链页面,\n    tags: ["Blog"],\n },';
+        // 查找评论系统输入框（Twikoo / Waline / Artalk）
+        const textarea =
+          document.querySelector("#tcomment .tk-textarea") ||
+          document.querySelector("#tcomment textarea") ||
+          document.querySelector(".wl-editor textarea") ||
+          document.querySelector(".wl-editor") ||
+          document.querySelector("#post-comments textarea");
+        if (textarea) {
+          if (textarea.tagName === "TEXTAREA" || textarea.tagName === "INPUT") {
+            textarea.value = template;
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            textarea.focus({ preventScroll: true });
+          } else {
+            // contenteditable 元素
+            textarea.innerText = template;
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            textarea.focus({ preventScroll: true });
+          }
+          textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else {
+          // 输入框未加载时复制到剪贴板
+          navigator.clipboard.writeText(template);
+          const orig = btn.innerHTML;
+          btn.textContent = "已复制到剪贴板";
+          setTimeout(() => { btn.innerHTML = orig; }, 1500);
+        }
+      });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => { initFlinkCopyButtons(); initFlinkImportTemplate(); });
+    } else {
+      initFlinkCopyButtons();
+      initFlinkImportTemplate();
+    }
+    document.addEventListener("astro:page-load", () => { initFlinkCopyButtons(); initFlinkImportTemplate(); });
+    document.addEventListener("astro:after-swap", () => { initFlinkCopyButtons(); initFlinkImportTemplate(); });
   </script>
 
-  <style is:global>
-    .friends-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 0.75rem;
+  <script set:html={`window.__FRIEND_LIST__ = ${friendListForInline};`}></script>
+
+  <script>
+    /* ========== 三区互不重复分组：正常友链 / 失效暂留 / 友链墓碑 ==========
+     * 数据流：总友链 = window.__FRIEND_LIST__（来自 friendsConfig.ts SSR 注入）
+     *       叠加 result.json 的 fail_count 字段
+     * 分组规则：
+     *   fail_count === 0     → 正常友链（保留显示在 #friends-grid）
+     *   fail_count ∈ [1, 6]  → 失效暂留（从正常区隐藏 + 渲染到 #friend-fail-window）
+     *   fail_count ≥ 7       → 友链墓碑（从正常区隐藏 + 渲染到 #friend-fail-tombstone）
+     * 保证三区互不重复。
+     */
+    (function () {
+      const FZ_CACHE_KEY = "checkFlinkResultCache_v1";
+      const FZ_CACHE_TTL = 30 * 60 * 1000;
+      const FAIL_WINDOW = [1, 6];
+      const TOMBSTONE = [7, 9999];
+      const DATA_URL = "https://check.fqzlr.com/result.json";
+
+      function normalizeUrl(u) {
+        return (u || "").replace(/\/$/, "").trim();
+      }
+      function inRange(n, range) {
+        const [min, max] = range;
+        return n >= min && n <= max;
+      }
+      function readCache() {
+        try {
+          const raw = localStorage.getItem(FZ_CACHE_KEY);
+          if (!raw) return null;
+          const p = JSON.parse(raw);
+          if (!p || !p.data || !p.ts) return null;
+          if (Date.now() - p.ts > FZ_CACHE_TTL) return null;
+          return p.data;
+        } catch { return null; }
+      }
+      function writeCache(data) {
+        try { localStorage.setItem(FZ_CACHE_KEY, JSON.stringify({ data, ts: Date.now() })); } catch {}
+      }
+      function faviconUrl(host) {
+        if (!host) return inlineSvgUrl("?");
+        return "https://www.google.com/s2/favicons?domain=" + encodeURIComponent(host) + "&sz=64";
+      }
+      function hostOf(url) {
+        try { return new URL(url).host.replace(/^www\./, ""); } catch { return ""; }
+      }
+      function escapeHtml(s) {
+        const map: Record<string, string> = {
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+        };
+        return String(s == null ? "" : s).replace(/[&<>"']/g, (c: string) => map[c]);
+      }
+      // 头像三级容错链：博主提供 → dicebear → 内联 SVG（永远不失败）
+      function dicebearUrl(name) {
+        const s = (name || "guest").trim().toLowerCase();
+        return "https://api.dicebear.com/7.x/notionists/svg?seed=" + encodeURIComponent(s);
+      }
+      function inlineSvgUrl(name) {
+        const text = (name || "?").trim().slice(0, 1).toUpperCase() || "?";
+        const hash = Array.from(text).reduce<number>((acc, ch) => (acc * 31 + (ch as string).charCodeAt(0)) >>> 0, 0);
+        const hue = hash % 360;
+        const bg = "hsl(" + hue + ", 55%, 55%)";
+        const svg =
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">' +
+          '<rect width="80" height="80" fill="' + bg + '"/>' +
+          '<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" ' +
+          'font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-weight="700" ' +
+          'font-size="40" fill="#fff">' + text + '</text>' +
+          '</svg>';
+        return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+      }
+      function pickAvatar(link, avatar, host, name) {
+        return avatar || dicebearUrl(name);
+      }
+
+      // 渲染"失效暂留" - 4 列横向小卡（样式对齐 prototype）
+      function renderFailWindow(items) {
+        const sec = document.getElementById("friend-fail-window");
+        const body = sec?.querySelector("[data-ffz-body]");
+        const sub = sec?.querySelector("[data-ffz-sub]");
+        const badge = sec?.querySelector("[data-ffz-badge]");
+        if (!sec || !body) return;
+        if (!items.length) { sec.classList.add("hidden"); return; }
+        sec.classList.remove("hidden");
+        if (sub) sub.textContent = "这里有 " + items.length + " 个正在发光的小站点。";
+        if (badge) badge.textContent = items.length + " sites";
+        body.innerHTML = items.map((it) => {
+          const host = hostOf(it.link);
+          const avatar = pickAvatar(it.link, it.avatar, host, it.name);
+          return (
+            '<a class="fail-card" role="listitem" href="' + escapeHtml(it.link) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(it.name) + '">' +
+              '<img class="fail-card-avatar" loading="lazy" decoding="async" src="' + escapeHtml(avatar) + '" alt="' + escapeHtml(it.name) + '" onerror="this.classList.add(\'is-error\');this.onerror=null;this.src=\'' + escapeHtml(faviconUrl(host)) + '\'" />' +
+              '<div class="fail-card-text">' +
+                '<div class="fail-card-name">' + escapeHtml(it.name) + '</div>' +
+                '<div class="fail-card-host">' + escapeHtml(host) + '</div>' +
+              '</div>' +
+            '</a>'
+          );
+        }).join("");
+      }
+
+      // 渲染"友链墓碑" - 横向多列头像墙（样式对齐 prototype）
+      function renderTombstone(items) {
+        const sec = document.getElementById("friend-fail-tombstone");
+        const wall = sec?.querySelector("[data-fft-wall]");
+        if (!sec || !wall) return;
+        if (!items.length) { sec.classList.add("hidden"); return; }
+        sec.classList.remove("hidden");
+        wall.innerHTML = items.map((it) => {
+          const host = hostOf(it.link);
+          const userAvatar = it.avatar || "";
+          const dicebear = dicebearUrl(it.name);
+          const initialSrc = userAvatar || dicebear;
+          const dicebearAttr = userAvatar ? dicebear : "";
+          const inlineAttr = inlineSvgUrl(it.name);
+          return (
+            '<span class="tomb-chip" role="listitem" title="' + escapeHtml(it.name) + '">' +
+              '<img class="tomb-avatar" loading="lazy" decoding="async" ' +
+                'src="' + escapeHtml(initialSrc) + '" ' +
+                'alt="' + escapeHtml(it.name) + '" ' +
+                'data-dicebear="' + escapeHtml(dicebearAttr) + '" ' +
+                'data-fb-inline="' + escapeHtml(inlineAttr) + '" ' +
+                'onerror="var d=this.dataset;if(d.fb1Used!==\'1\'&&d.dicebear){d.fb1Used=\'1\';var s=this;this.onerror=function(){s.onerror=null;s.src=d.fbInline;};this.src=d.dicebear;}else{this.onerror=null;this.src=d.fbInline;}" />' +
+              '<span class="tomb-name">' + escapeHtml(it.name) + '</span>' +
+            '</span>'
+          );
+        }).join("");
+      }
+
+      /**
+       * 核心分组 + 渲染
+       * 互不重复：每个友链按 fail_count 落入唯一分组
+       *   0 → 正常区（保留 .friend-card 显示）
+       *   1-6 → 失效暂留（先隐藏 .friend-card，再渲染到 ffz-body）
+       *   ≥7 → 友链墓碑（先隐藏 .friend-card，再渲染到 fft-wall）
+       */
+      function applyData(data) {
+        const list = (data && Array.isArray(data.link_status)) ? data.link_status : [];
+        // 1) 构建 link→fail_count map
+        const failMap = new Map();
+        for (const it of list) {
+          if (it && it.link) failMap.set(normalizeUrl(it.link), Number(it.fail_count || 0));
+        }
+
+        // 2) 总友链数据（来自 SSR 注入）
+        const friendList = Array.isArray((window as any).__FRIEND_LIST__) ? (window as any).__FRIEND_LIST__ : [];
+        const friendByLink = new Map();
+        for (const f of friendList) {
+          if (f && f.link) friendByLink.set(normalizeUrl(f.link), f);
+        }
+
+        // 3) 遍历正常区 .friend-card：分类
+        const failList: any[] = [];   // 失效暂留
+        const tombList: any[] = [];   // 友链墓碑
+        const grid = document.getElementById("friends-grid");
+        if (grid) {
+          const cards = grid.querySelectorAll(".friend-card[data-friend-id]");
+          cards.forEach((cardEl) => {
+            const link = cardEl.getAttribute("data-friend-id") || "";
+            const fc = failMap.get(normalizeUrl(link)) || 0;
+            const friend = friendByLink.get(normalizeUrl(link)) || { name: link, link };
+            if (inRange(fc, FAIL_WINDOW)) {
+              // 失效暂留：从正常区隐藏 + 加入 failList
+              (cardEl as HTMLElement).style.display = "none";
+              failList.push({ ...friend, link, fail_count: fc });
+            } else if (inRange(fc, TOMBSTONE)) {
+              // 友链墓碑：从正常区隐藏 + 加入 tombList
+              (cardEl as HTMLElement).style.display = "none";
+              tombList.push({ ...friend, link, fail_count: fc });
+            } else {
+              // fail_count === 0：保留显示（正常友链）
+              // 可选：更新 .friend-status 徽章
+              (cardEl as HTMLElement).style.display = "";
+            }
+          });
+        }
+
+        // 4) 按 fail_count 降序排序
+        const sortDesc = (a, b) => (b.fail_count || 0) - (a.fail_count || 0);
+        failList.sort(sortDesc);
+        tombList.sort(sortDesc);
+
+        // 5) 渲染失效暂留 + 友链墓碑
+        renderFailWindow(failList);
+        renderTombstone(tombList);
+      }
+
+      async function init() {
+        // 非友链页不执行
+        if (!document.getElementById("friend-fail-window")) return;
+
+        // 1) 先用缓存快速渲染（避免闪烁）
+        const cached = readCache();
+        if (cached) applyData(cached);
+
+        // 2) 后台拉取最新数据
+        try {
+          const res = await fetch(DATA_URL, { cache: "no-store" });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const data = await res.json();
+          writeCache(data);
+          applyData(data);
+        } catch (err) {
+          console.warn("[friend-zones] 拉取失败，使用缓存：", err);
+        }
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
+      }
+      document.addEventListener("astro:page-load", init);
+      document.addEventListener("astro:after-swap", init);
+    })();
+  </script>
+
+  <script>
+    /* ========== 客户端动态更新：从 friends.json.ts 端点获取最新数据，更新网格 ==========
+     * SSR 渲染提供初始数据（SEO + 首屏），页面加载后通过此脚本实时更新。
+     * 当 FriendsEditor.svelte 提交变更到 GitHub 后，下一次刷新即可看到最新数据。
+     */
+    (function refreshFriendsGrid() {
+      async function doRefresh() {
+        try {
+          const res = await fetch("/friends.json", { cache: "no-store" });
+          if (!res.ok) return;
+          const data = await res.json();
+          const grid = document.getElementById("friends-grid");
+          if (!grid || !Array.isArray(data.link_list)) return;
+
+          const latestMap = new Map();
+          data.link_list.forEach(function (f) {
+            var key = (f.link || "").replace(/\/$/, "");
+            latestMap.set(key, f);
+          });
+
+          // 更新现有卡片：名称、头像、描述、链接
+          grid.querySelectorAll(".friend-card[data-friend-id]").forEach(function (card) {
+            var link = (card.getAttribute("data-friend-id") || "").replace(/\/$/, "");
+            var latest = latestMap.get(link);
+            if (!latest) return;
+
+            // 更新 <a> 链接
+            var anchor = card.tagName === "A" ? card : card.querySelector("a");
+            if (anchor && latest.link) {
+              (anchor as HTMLAnchorElement).href = latest.link;
+            }
+
+            // 更新头像
+            var img = card.querySelector("img");
+            if (img && latest.avatar) {
+              img.src = latest.avatar;
+            }
+
+            // 更新标题
+            var titleEl = card.querySelector(".font-bold");
+            if (titleEl && latest.name) {
+              titleEl.textContent = latest.name;
+            }
+
+            // 更新描述
+            var descEl = card.querySelector(".text-sm.text-neutral-500");
+            if (descEl && latest.descr) {
+              descEl.textContent = latest.descr;
+            }
+          });
+
+          // 更新 window.__FRIEND_LIST__（供失效分区脚本使用）
+          if (Array.isArray(data.link_list)) {
+            (window as any).__FRIEND_LIST__ = data.link_list.map(function (f) {
+              return {
+                name: f.name,
+                link: f.link,
+                avatar: f.avatar,
+                desc: f.descr || "",
+                siteshot: f.siteshot || "",
+              };
+            });
+          }
+        } catch (e) {
+          console.warn("[friends] 动态更新失败，使用 SSR 数据:", e);
+        }
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", doRefresh);
+      } else {
+        doRefresh();
+      }
+      document.addEventListener("astro:page-load", doRefresh);
+      document.addEventListener("astro:after-swap", doRefresh);
+    })();
+  </script>
+
+  <script>
+    /* ========== 悬停卡片浮出主页截图预览（跟随鼠标） ==========
+     * 数据源：Layout.astro 的 renderLinkStatus() 从 check-flink result.json 注入的
+     *         data-siteshot 属性（与卡片内嵌截图共用同一数据流，不新增依赖）。
+     * 仅精确指针设备启用；预览层 pointer-events:none 不阻塞卡片交互。
+     *
+     * 【关键】preview div 通过 document.body.appendChild 挂载到 body 末尾，
+     * 不属于 Swup 容器，跨页面切换不会被销毁。
+     * 样式必须放在全局 CSS（src/styles/components/friend-image-preview.css），
+     * 否则离开友链页后该 div 失去 position/opacity 等样式，
+     * 会落到 body 文档流中暴露已加载的图片作为"页面背景"。
+     * 即便样式已全局化，这里也在每次 Swup 切换前主动清空图片 src 并隐藏，
+     * 形成双重保险，避免任何时序竞态。
+     */
+    (function initFriendImagePreview() {
+      if ((window as any).__friendImagePreviewReady) return;
+      (window as any).__friendImagePreviewReady = true;
+
+      if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+
+      var preview = document.createElement("div");
+      preview.className = "friend-image-preview";
+      preview.setAttribute("aria-hidden", "true");
+      var previewImg = document.createElement("img");
+      previewImg.alt = "";
+      previewImg.decoding = "async";
+      preview.appendChild(previewImg);
+      document.body.appendChild(preview);
+
+      var GAP = 16;
+
+      // 完全清理：移除 is-visible + 清空图片 src（释放解码缓存，避免过渡瞬间残影）
+      function hardHide() {
+        preview.classList.remove("is-visible");
+        // 把位置移到屏幕外，配合全局 visibility:hidden 双重保险
+        try {
+          preview.style.left = "-9999px";
+          preview.style.top = "-9999px";
+        } catch (_) { /* ignore */ }
+      }
+
+      function place(x, y) {
+        var rect = preview.getBoundingClientRect();
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        // 优先显示在鼠标右下方，空间不足时翻转到左侧/收进视口
+        var left = x + GAP;
+        var top = y + GAP;
+        if (left + rect.width > vw - 8) left = x - rect.width - GAP;
+        if (top + rect.height > vh - 8) top = Math.max(8, vh - rect.height - 8);
+        preview.style.left = left + "px";
+        preview.style.top = top + "px";
+      }
+
+      function show(card, x, y) {
+        var src = card.dataset.siteshot;
+        if (!src) return;
+        if (previewImg.getAttribute("src") !== src) previewImg.src = src;
+        preview.classList.add("is-visible");
+        place(x, y);
+      }
+
+      function hide() {
+        preview.classList.remove("is-visible");
+      }
+
+      document.addEventListener("mouseover", function (e) {
+        var target = e.target;
+        var card = target instanceof Element ? target.closest("[data-siteshot]") : null;
+        if (card && card instanceof HTMLElement) {
+          show(card, e.clientX, e.clientY);
+        }
+      });
+
+      document.addEventListener("mouseout", function (e) {
+        var target = e.target;
+        var card = target instanceof Element ? target.closest("[data-siteshot]") : null;
+        if (!card) return;
+        var to = e.relatedTarget;
+        // 卡片内部移动不隐藏
+        if (to instanceof Element && to.closest("[data-siteshot]") === card) return;
+        hide();
+      });
+
+      document.addEventListener("mousemove", function (e) {
+        if (!preview.classList.contains("is-visible")) return;
+        place(e.clientX, e.clientY);
+      });
+
+      // 页面切换前/后立即隐藏，避免 Swup 过渡期间（main-grid opacity 0.01）
+      // 预览图片以"页面背景"形式暴露在 body 末尾
+      document.addEventListener("astro:before-swap", hardHide);
+      document.addEventListener("astro:after-swap", hardHide);
+      document.addEventListener("astro:page-load", hardHide);
+    })();
+  </script>
+
+  <script>
+    /* ========== 友链视图切换：截图视图（默认）/ 简洁视图（Aemeath 紧凑卡片） ==========
+     * 切换 #friends-grid 的 data-view 属性，样式由上方 <style> 中的
+     * #friends-grid[data-view="compact"] 规则承担。
+     * 选择持久化到 localStorage；IIFE + ready 标记防止 Swup 重复绑定。 */
+    (function initFriendViewToggle() {
+      if ((window as any).__friendViewToggleReady) {
+        // Swup 页面重新进入：重新应用一次持久化视图并绑定新 DOM
+        applySavedView();
+      }
+      (window as any).__friendViewToggleReady = true;
+
+      var STORAGE_KEY = "friends-view-mode";
+
+      function getGrid() {
+        return document.getElementById("friends-grid");
+      }
+      function getBtn() {
+        return document.getElementById("friend-view-toggle");
+      }
+
+      function applyView(mode) {
+        var grid = getGrid();
+        var btn = getBtn();
+        if (!grid) return;
+        var compact = mode === "compact";
+        grid.setAttribute("data-view", compact ? "compact" : "screenshot");
+        if (btn) {
+          btn.setAttribute("data-expanded", String(compact));
+          btn.setAttribute("aria-expanded", String(compact));
+          var label = btn.querySelector("[data-view-toggle-label]");
+          // 按钮文案显示"将切换到的视图"
+          if (label) label.textContent = compact ? "截图视图" : "简洁视图";
+        }
+      }
+
+      function getSavedView() {
+        try {
+          return localStorage.getItem(STORAGE_KEY) === "compact"
+            ? "compact"
+            : "screenshot";
+        } catch (_) {
+          return "screenshot";
+        }
+      }
+
+      function applySavedView() {
+        applyView(getSavedView());
+      }
+
+      if (!(window as any).__friendViewToggleBound) {
+        (window as any).__friendViewToggleBound = true;
+        document.addEventListener("click", function (e) {
+          var target = e.target instanceof Element ? e.target : null;
+          if (!target) return;
+          var btn = target.closest("#friend-view-toggle");
+          if (!btn) return;
+          var next =
+            getGrid()?.getAttribute("data-view") === "compact"
+              ? "screenshot"
+              : "compact";
+          applyView(next);
+          try {
+            localStorage.setItem(STORAGE_KEY, next);
+          } catch (_) { /* ignore */ }
+        });
+        // 首次进入 / Swup 页面加载完成后应用持久化视图
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", applySavedView, { once: true });
+        } else {
+          applySavedView();
+        }
+        document.addEventListener("astro:page-load", applySavedView);
+        document.addEventListener("astro:after-swap", applySavedView);
+      }
+    })();
+  </script>
+
+  <style>
+    /* ============ 友链申请指南区域 ============ */
+    .flink-guide-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .flink-panel-card {
+      position: relative;
+      border-radius: var(--sidebar-card-radius, 0.75rem);
+      background: var(--sidebar-card-bg, oklch(100% 0 0));
+      border: 1px solid var(--sidebar-card-border, oklch(85% 0 0));
+      box-shadow: var(--sidebar-card-shadow, 0 4px 12px rgba(0, 0, 0, 0.04));
+      padding: 12px 14px;
+      transition:
+        border-color 0.3s ease,
+        box-shadow 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .flink-panel-card:hover {
+      border-color: var(--sidebar-card-border-hover, var(--primary));
+      box-shadow: var(--sidebar-card-shadow-hover, 0 6px 18px rgba(0, 0, 0, 0.08));
+    }
+    :global(.dark) .flink-panel-card {
+      background: var(--sidebar-card-bg, oklch(8% 0 0));
+      border-color: var(--sidebar-card-border, oklch(25% 0 0));
+    }
+
+    .flink-panel-copy {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+    }
+
+    .flink-code-text {
+      font-size: 12px;
+      line-height: 1.7;
+      color: oklch(0.45 0 0);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    :global(.dark) .flink-code-text {
+      color: oklch(0.7 0 0);
+    }
+
+    .flink-copy-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: oklch(0.55 0 0);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background-color 0.2s, color 0.2s;
+    }
+    .flink-copy-btn:hover {
+      background: oklch(0.9 0 0);
+      color: oklch(0.3 0 0);
+    }
+    :global(.dark) .flink-copy-btn:hover {
+      background: oklch(0.28 0 0);
+      color: oklch(0.8 0 0);
+    }
+    .flink-copy-btn .flink-check-icon {
+      display: none;
+    }
+    .flink-copy-btn.copied .flink-copy-icon {
+      display: none;
+    }
+    .flink-copy-btn.copied .flink-check-icon {
+      display: block;
+      color: oklch(0.65 0.15 145);
+    }
+
+    .flink-step {
+      display: flex;
+      gap: 12px;
+      position: relative;
+    }
+    .flink-step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: oklch(0.93 0 0);
+      color: oklch(0.45 0 0);
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    :global(.dark) .flink-step-num {
+      background: oklch(0.25 0 0);
+      color: oklch(0.7 0 0);
+    }
+    .flink-step-line {
+      position: absolute;
+      left: 11px;
+      top: 28px;
+      bottom: 2px;
+      width: 2px;
+      background: oklch(0.9 0 0);
+    }
+    :global(.dark) .flink-step-line {
+      background: oklch(0.25 0 0);
+    }
+    .flink-step-body {
+      padding-bottom: 18px;
+      min-width: 0;
+    }
+    .flink-step:last-child .flink-step-body {
+      padding-bottom: 0;
+    }
+
+    .flink-template {
+      position: relative;
+      border-radius: 10px;
+      background: oklch(0.965 0 0);
+      padding: 12px 14px;
+    }
+    :global(.dark) .flink-template {
+      background: oklch(0.2 0 0);
+    }
+    .flink-template-copy {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+    }
+    .flink-template-text {
+      font-size: 12px;
+      line-height: 1.7;
+      color: oklch(0.45 0 0);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    :global(.dark) .flink-template-text {
+      color: oklch(0.7 0 0);
+    }
+
+    .flink-note-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: oklch(0.7 0.12 70);
+      flex-shrink: 0;
+    }
+
+    .edit-main-btn-style {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      padding: 6px 12px !important;
+      border-radius: 8px !important;
+      border: 1px solid rgba(0, 0, 0, 0.9) !important;
+      background: transparent !important;
+      color: rgba(0, 0, 0, 0.9) !important;
+      font-size: 13px !important;
+      font-weight: 500 !important;
+      cursor: pointer !important;
+      transition: background-color 0.2s, color 0.2s !important;
+      white-space: nowrap !important;
+      line-height: 1 !important;
+      height: 32px !important;
+      box-sizing: border-box !important;
+    }
+
+    .edit-main-btn-style:hover {
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+    }
+
+    :global(.dark) .edit-main-btn-style {
+      border-color: rgba(255, 255, 255, 0.9);
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    :global(.dark) .edit-main-btn-style:hover {
+      background: rgba(255, 255, 255, 0.9);
+      color: rgba(0, 0, 0, 0.9);
+    }
+
+    /* ============ 悬停主页截图预览（body 级浮层，样式已抽到全局 friend-image-preview.css） ============
+     * 这里只放 friends 页面特有的样式，全局基础样式（position/opacity/z-index 等）
+     * 见 src/styles/components/friend-image-preview.css。
+     * 必须放在全局：preview div 挂载到 document.body，不随 Swup 销毁；
+     * 若样式只在此页生效，跨页后 div 会落到 body 流中暴露图片。
+     */
+    @media (max-width: 768px) {
+      :has(> .page-header-toolbar-slot) {
+        flex-direction: column;
+      }
+      .page-header-toolbar-slot {
+        width: 100%;
+      }
+    }
+
+    /* ============ 页头工具栏共用药丸按钮（如何申请友链 / 视图切换） ============ */
+    .friend-toolbar-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      min-height: 2rem;
+      padding: 0.35rem 0.7rem;
+      border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line-divider));
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--primary) 8%, var(--card-bg));
+      color: var(--primary);
+      font-size: 0.75rem;
+      font-weight: 650;
+      line-height: 1;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+    }
+    .friend-toolbar-pill:hover {
+      border-color: color-mix(in srgb, var(--primary) 42%, var(--line-divider));
+      background: color-mix(in srgb, var(--primary) 14%, var(--card-bg));
+    }
+    .friend-toolbar-pill:focus-visible {
+      outline: 2px solid color-mix(in srgb, var(--primary) 68%, transparent);
+      outline-offset: 2px;
+    }
+    .friend-toolbar-pill:active {
+      transform: scale(0.96);
+    }
+    .friend-toolbar-pill :global(svg) {
+      flex: 0 0 auto;
+    }
+    /* 视图切换按钮专属：箭头旋转 */
+    .friend-view-toggle :global(svg) {
+      transition: transform 200ms ease;
+    }
+    .friend-view-toggle[data-expanded="true"] :global(svg) {
+      transform: rotate(180deg);
+    }
+
+    /* ============ 简洁视图（复刻 Aemeath 紧凑卡片：头像 + 标题 + 描述 + 标签，隐藏卡内截图） ============
+     * 注意：卡片内部元素由 FriendCard.astro 渲染， Astro scoped 样式匹配不到，
+     * 必须用 :global() 包裹，否则切换按钮不生效。
+     * 鼠标悬浮截图由全局 mouse-follow 预览（friend-image-preview）承担，两种视图都生效 */
+    #friends-grid[data-view="compact"] :global(.friend-card-screenshot) {
+      display: none;
+    }
+    /* 卡片 = 信息区：补全四边框 + 圆角（截图视图下边框由截图区/信息区分段拼出） */
+    #friends-grid[data-view="compact"] :global(.friend-card-info) {
+      width: 100%;
+      align-items: center;
+      min-height: 0;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid var(--card-border, oklch(85% 0 0 / 0.92));
+      border-radius: 16px;
+    }
+    #friends-grid[data-view="compact"] :global(.friend-card-link:hover .friend-card-info) {
+      border-color: var(--card-border-hover, rgba(15, 23, 42, 0.16));
+    }
+    /* 头像：方形圆角、不上移（Aemeath w-16 rounded-xl） */
+    #friends-grid[data-view="compact"] :global(.friend-card-avatar-wrap) {
+      width: 3.5rem;
+      height: 3.5rem;
+      margin: 0;
+    }
+    #friends-grid[data-view="compact"] :global(.friend-card-avatar) {
+      border-radius: 0.75rem;
+    }
+    /* 文字列：单行描述 + 显示标签 */
+    #friends-grid[data-view="compact"] :global(.friend-card-text) {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    #friends-grid[data-view="compact"] :global(.friend-card-desc) {
+      display: block;
+      min-height: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      -webkit-line-clamp: 1;
+      line-clamp: 1;
+    }
+    #friends-grid[data-view="compact"] :global(.friend-card-tags) {
+      display: flex;
+    }
+    /* hover 上浮 + 置顶（让特效/预览不被相邻卡片压住） */
+    #friends-grid[data-view="compact"] :global(.friend-card:hover) {
+      z-index: 60;
+    }
+    /* 紧凑卡内装饰元素适度缩小 */
+    #friends-grid[data-view="compact"] :global(.friend-card-recommended-star),
+    #friends-grid[data-view="compact"] :global(.friend-card-own-deco) {
+      width: 3.4rem;
+      height: 3.2rem;
+    }
+    /* 状态徽章：紧凑卡更矮小，徽章同步缩小避免视觉过大 */
+    #friends-grid[data-view="compact"] :global(.friend-status) {
+      top: 0.375rem;
+      right: 0.375rem;
+      gap: 0.2rem;
+      padding: 0.1rem 0.35rem 0.1rem 0.3rem;
+      font-size: 0.5625rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+    #friends-grid[data-view="compact"] :global(.friend-status::before) {
+      width: 4px;
+      height: 4px;
+    }
+    /* 紧凑模式下保持站长/推荐卡色调（ID 优先级与上方基础规则相同，靠源顺序取胜） */
+    #friends-grid[data-view="compact"] :global(.friend-card-link--own .friend-card-info) {
+      border-color: color-mix(in srgb, #8d7cff 38%, var(--card-border, oklch(85% 0 0 / 0.92)));
+      background: color-mix(in srgb, #ebe8ff 48%, var(--card-bg, #fff));
+      box-shadow: 0 0.28rem 0.9rem color-mix(in srgb, #8d7cff 16%, transparent);
+    }
+    #friends-grid[data-view="compact"] :global(.friend-card-link--recommended .friend-card-info) {
+      border-color: color-mix(in srgb, #f4bb2e 42%, var(--card-border, oklch(85% 0 0 / 0.92)));
+      background: color-mix(in srgb, #fff0a2 48%, var(--card-bg, #fff));
+      box-shadow: 0 0.28rem 0.9rem color-mix(in srgb, #f4bb2e 18%, transparent);
+    }
+    :global(.dark) #friends-grid[data-view="compact"] :global(.friend-card-link--own .friend-card-info) {
+      border-color: color-mix(in srgb, #a594ff 36%, var(--card-border, rgba(255, 255, 255, 0.10)));
+      background: color-mix(in srgb, #3a2e7a 32%, var(--card-bg, #1c1d20));
+      box-shadow: 0 0.28rem 0.9rem color-mix(in srgb, #8d7cff 18%, transparent);
+    }
+    :global(.dark) #friends-grid[data-view="compact"] :global(.friend-card-link--recommended .friend-card-info) {
+      border-color: color-mix(in srgb, #e9bd51 32%, var(--card-border, rgba(255, 255, 255, 0.10)));
+      background: color-mix(in srgb, #7a5714 18%, var(--card-bg, #1c1d20));
+      box-shadow: 0 0.28rem 0.9rem color-mix(in srgb, #d39b24 12%, transparent);
     }
   </style>
-</MainGridLayout>
+  </MainGridLayout>

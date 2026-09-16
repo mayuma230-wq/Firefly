@@ -1,39 +1,32 @@
 import type { DynamicConfig } from "@/types/dynamicConfig";
+import { momentsCover, momentsPageConfig } from "./momentsConfig";
 
+// 兼容说明：复用 momentsCover / momentsPageConfig 作为默认值，
+// 修改 moments 封面时 /dynamic/ 也会同步更新；/moments/ 下线后可改为独立静态值。
 export const dynamicConfig: DynamicConfig = {
-	// 页面标题，如果留空则使用 i18n 中的翻译
-	title: "",
-
-	// 页面描述文本，如果留空则使用 i18n 中的翻译
-	description: "",
-
-	// 动态头像和名称的跳转地址，支持站内路径或完整 URL
-	profileUrl: "/about/",
-
+	// 页面标题：影响面包屑、<h1>、<title>
+	title: momentsPageConfig.title || "动态",
+	// 页面描述：用于 <meta name="description">
+	description: momentsPageConfig.description || "记录生活中的点点滴滴",
 	// 是否为每条动态启用评论，需要先在 commentConfig.ts 启用评论系统
-	showComment: true,
-
-	// 每页显示的动态数量
-	itemsPerPage: 20,
-
-	// 动态数据 json 地址，本地默认 "/api/dynamic.json"
-	// 可改为第三方接口地址，如 "https://firefly.cuteleaf.cn/api/dynamic.json"
-	// 数据结构可打开上方链接地址参考
-	// 当 memos.enable 为 true 时，此配置会被忽略
+	showComment: false,
+	// 每页条数：至少 1，传 0 会被钳制
+	itemsPerPage: 10,
+	// 数据源 URL：站内相对路径或以 http 开头的绝对 URL（外部 Memos 等）
 	apiUrl: "/api/dynamic.json",
 
-	// ========== Memos 配置 ==========
-	// 启用后客户端会直接从 Memos API 实时获取数据，apiUrl 配置将被忽略
-	// Memos 记得配置 CORS，否则可能会出现跨域问题
+	// 顶部封面区域：复用 moments 配置保证视觉一致
+	coverImage: momentsCover.cover_image, // 封面背景图 URL
+	coverAvatar: momentsCover.cover_avatar, // 封面头像 URL
+	coverName: momentsCover.cover_name, // 封面用户名
+	coverBio: momentsCover.cover_bio, // 封面简介
+	// 是否显示封面区域：默认 true
+	showCover: true,
+
+	// Memos 适配配置（保留扩展位，默认关闭；启用时需同步 DynamicFeed.svelte 中的 memos 加载分支）
 	memos: {
-		// 是否启用 Memos 数据源
-		enable: false,
-
-		// Memos 实例地址
-		apiUrl: "https://memos.example.com",
-
-		// Memos 用户标识，如 "users/你的memos用户名"，用于过滤指定用户的动态
-		// 注意：需与 Memos API 返回的 creator 字段完全一致（区分大小写），例如实际用户名为 admin 时应为 "users/admin"，而非"users/Admin"
-		parent: "users/xiaye",
+		enable: false, // 是否启用 Memos 数据源
+		apiUrl: "", // Memos 服务地址（需支持 CORS）
+		parent: "", // 父级 ID（用于筛选特定范围的 memo）
 	},
 };

@@ -1,4 +1,4 @@
-import type { CommentConfig } from "../types/commentConfig";
+import type { CommentConfig } from "../types/config";
 
 export const commentConfig: CommentConfig = {
 	// 评论系统类型: none, twikoo, waline, giscus, disqus, artalk，默认为none，即不启用评论系统
@@ -6,24 +6,17 @@ export const commentConfig: CommentConfig = {
 
 	//twikoo评论系统配置
 	twikoo: {
-		envId: "https://twikoo.vercel.app",
+		envId: "",
 		// 设置 Twikoo 评论系统语言
 		lang: "zh-CN",
 		// 是否启用文章访问量统计功能
-		visitorCount: true,
-		// Twikoo JS 文件地址，支持 CDN 链接
-		// 中国推荐1: https://registry.npmmirror.com/twikoo/1.7.14/files/dist/twikoo.min.js
-		// 中国推荐2: https://s4.zstatic.net/npm/twikoo@1.7.14/dist/twikoo.min.js
-		// 国际推荐: https://cdn.jsdelivr.net/npm/twikoo@1.7.14/dist/twikoo.min.js
-		jsUrl: "https://cdn.jsdelivr.net/npm/twikoo@1.7.14/dist/twikoo.min.js",
-		// Twikoo 自定义 CSS 文件地址，为空则不加载
-		cssUrl: "/assets/css/twikoo-custom.css",
+		visitorCount: false,
 	},
 
 	//waline评论系统配置
 	waline: {
 		// waline 后端服务地址
-		serverURL: "https://waline.vercel.app",
+		serverURL: "",
 		// 设置 Waline 评论系统语言
 		lang: "zh-CN",
 		// 设置 Waline 评论系统表情地址
@@ -31,6 +24,7 @@ export const commentConfig: CommentConfig = {
 			"https://unpkg.com/@waline/emojis@1.4.0/weibo",
 			"https://unpkg.com/@waline/emojis@1.4.0/bilibili",
 			"https://unpkg.com/@waline/emojis@1.4.0/bmoji",
+			"",
 		],
 		// 评论登录模式。可选值如下：
 		//   'enable'   —— 默认，允许访客匿名评论和用第三方 OAuth 登录评论，兼容性最佳。
@@ -39,6 +33,35 @@ export const commentConfig: CommentConfig = {
 		login: "enable",
 		// 是否启用文章访问量统计功能
 		visitorCount: true,
+
+		// ===== 评论图片上传（图床接入） =====
+		// 教程参考：
+		//   Waline 官方：https://waline.js.org/cookbook/customize/upload-image.html
+		//   图床上传 API：https://cfbed.sanyue.de/api/upload.html
+		//   Token 管理：https://cfbed.sanyue.de/api/token.html
+		//
+		// 原理：Waline 的 imageUploader 选项接收一个函数，将用户粘贴/选择的图片
+		//       上传到图床，返回图片 URL 后自动插入评论正文。
+		//
+		// 使用方法：
+		//   1. 在图床管理面板创建 API Token（权限勾选 upload）
+		//   2. 将图床上传地址填入 imageUploadURL（如 ）
+		//   3. 将 Token 填入 imageUploadToken（如 imgbed_xxxxx）
+		//   4. 两项都填写后，评论区自动启用图片上传；任一留空则禁用
+		//
+		// 图床上传 API 格式（CloudFlare ImgBed / cfbed 规范）：
+		//   POST {imageUploadURL}
+		//   Headers: Authorization: Bearer {imageUploadToken}, Accept: application/json
+		//   Body: FormData { file: <图片文件> }
+		//   响应: [{ "src": "/file/xxx.png", "publicUrl": "https://tu.fqzlr.com/file/xxx.png" }]
+		//
+		// 图床上传地址（/upload 端点，支持 authCode 或 Bearer Token 认证）
+		imageUploadURL: "",
+		// 图床 API Token（在图床管理面板 → Token 管理 中创建，权限需包含 upload）
+		// ❗ 不要在此填写 Token！请通过环境变量注入：
+		//   Vercel：Settings → Environment Variables → 添加 PUBLIC_IMG_UPLOAD_TOKEN
+		//   本地开发：在项目根目录 .env 文件中添加 PUBLIC_IMG_UPLOAD_TOKEN=imgbed_xxxxx
+		imageUploadToken: import.meta.env?.PUBLIC_IMG_UPLOAD_TOKEN || "",
 	},
 
 	// artalk评论系统配置
@@ -53,14 +76,14 @@ export const commentConfig: CommentConfig = {
 
 	//giscus评论系统配置
 	giscus: {
-		// 设置 Giscus 评论系统仓库
-		repo: "CuteLeaf/Firefly",
+		// 设置 Giscus 评论系统仓库（填自己的 user/repo）
+		repo: "",
 		// 设置 Giscus 评论系统仓库ID
-		repoId: "R_kgD2gfdFGd",
+		repoId: "",
 		// 设置 Giscus 评论系统分类
 		category: "General",
 		// 获取 Giscus 评论系统分类ID
-		categoryId: "DIC_kwDOKy9HOc4CegmW",
+		categoryId: "",
 		// 获取 Giscus 评论系统映射方式
 		mapping: "title",
 		// 获取 Giscus 评论系统严格模式

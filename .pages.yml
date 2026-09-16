@@ -1,0 +1,885 @@
+# ============================================================
+# PagesCMS 配置文件 - 马俊宇博客
+# 文档: https://pagescms.org/docs/configuration
+# ============================================================
+
+# ------------------------------------------------------------
+# 媒体配置
+# ------------------------------------------------------------
+media:
+  # 文章配图
+  - name: post-images
+    label: 文章配图
+    input: src/content/posts/images
+    output: /images
+    categories: [image]
+
+  # 站点资源
+  - name: assets
+    label: 站点资源
+    input: public/assets
+    output: /assets
+    categories: [image]
+
+  # 头图/壁纸
+  - name: banner
+    label: 站点头图
+    input: public/assets/images
+    output: /assets/images
+    categories: [image]
+
+# ------------------------------------------------------------
+# 全局设置
+# ------------------------------------------------------------
+settings:
+  content:
+    merge: true
+
+# ------------------------------------------------------------
+# 内容分组
+# ------------------------------------------------------------
+content:
+
+  # ============================================================
+  # 📝 内容管理
+  # ============================================================
+  - name: content-group
+    label: 📝 内容管理
+    type: group
+    description: 博客文章、特殊页面、站点资源等核心内容
+    items:
+
+      # 1. 博客文章
+      - name: posts
+        label: 📝 博客文章
+        type: collection
+        path: src/content/posts
+        format: yaml-frontmatter
+        subfolders: true
+        filename:
+          template: "{primary}.md"
+          field: create
+        exclude: ["**/images/**", "**/*.avif", "**/*.webp", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif"]
+        view:
+          primary: title
+          fields: [title, published, category, draft, pinned]
+          sort: ["published desc", "title asc"]
+          search: [title, description, tags, category]
+          default:
+            sort: published
+            order: desc
+        fields:
+          - name: title
+            label: 标题
+            type: string
+            required: true
+            description: 文章标题
+
+          - name: published
+            label: 发布时间
+            type: date
+            required: true
+            options:
+              time: false
+              format: yyyy-MM-dd
+
+          - name: updated
+            label: 更新时间
+            type: date
+            options:
+              time: false
+              format: yyyy-MM-dd
+
+          - name: draft
+            label: 草稿
+            type: boolean
+            default: false
+            description: 设为草稿则不在前台显示
+
+          - name: description
+            label: 文章摘要
+            type: text
+            description: 简短描述，留空则自动截取正文
+
+          - name: image
+            label: 封面图
+            type: image
+            description: 文章封面图片路径
+
+          - name: tags
+            label: 标签
+            type: string
+            list: true
+            description: 文章标签，可添加多个
+
+          - name: category
+            label: 分类
+            type: string
+            description: 文章分类
+
+          - name: pinned
+            label: 置顶
+            type: boolean
+            default: false
+            description: 置顶文章显示在列表最前面
+
+          - name: author
+            label: 作者
+            type: string
+            description: 覆盖默认作者名（通常留空）
+
+          - name: comment
+            label: 启用评论
+            type: boolean
+            default: true
+
+          - name: body
+            label: 正文
+            type: rich-text
+            required: true
+
+      # 2. 关于页面
+      - name: about
+        label: 👤 关于页面
+        type: file
+        path: src/content/spec/about.md
+        format: yaml-frontmatter
+        description: 关于我页面的内容
+        fields:
+          - name: title
+            label: 页面标题
+            type: string
+            default: 关于我
+          - name: body
+            label: 正文
+            type: rich-text
+
+      # 3. 友情链接
+      - name: friends-page
+        label: 🔗 友链页面
+        type: file
+        path: src/content/spec/friends.md
+        format: yaml-frontmatter
+        description: 友情链接页面的自定义内容
+        fields:
+          - name: title
+            label: 页面标题
+            type: string
+            default: 友情链接
+          - name: body
+            label: 正文
+            type: rich-text
+
+      # 4. 留言板
+      - name: guestbook
+        label: 📬 留言板
+        type: file
+        path: src/content/spec/guestbook.md
+        format: yaml-frontmatter
+        description: 留言板页面内容
+        fields:
+          - name: title
+            label: 页面标题
+            type: string
+            default: 留言板
+          - name: body
+            label: 正文
+            type: rich-text
+
+      # 5. 项目导航页
+      - name: projects-page
+        label: 🌐 项目导航页
+        type: file
+        path: src/content/spec/projects.md
+        format: yaml-frontmatter
+        description: 网站导航/项目页面的自定义内容
+        fields:
+          - name: title
+            label: 页面标题
+            type: string
+          - name: body
+            label: 正文
+            type: rich-text
+
+      # 6. 站点资源
+      - name: ziyuan
+        label: 📢 站点资源
+        type: collection
+        path: src/content/ziyuan
+        view:
+          primary: title
+        fields:
+          - name: title
+            label: 标题
+            type: string
+            required: true
+
+          - name: content
+            label: 内容
+            type: text
+
+          - name: closable
+            label: 可关闭
+            type: boolean
+            default: true
+
+          - name: link
+            label: 链接配置
+            type: object
+            fields:
+              - name: enable
+                label: 启用链接
+                type: boolean
+                default: false
+              - name: text
+                label: 链接文字
+                type: string
+              - name: url
+                label: 链接地址
+                type: string
+              - name: external
+                label: 新窗口打开
+                type: boolean
+                default: false
+
+          - name: body
+            label: 正文
+            type: rich-text
+
+  # ============================================================
+  # 🎬 我的收藏
+  # ============================================================
+  - name: bangumi-group
+    label: 🎬 我的收藏
+    type: group
+    description: 番剧、影视、游戏、音乐、书籍收藏管理
+    items:
+
+      - name: bangumi
+        label: 🎬 收藏列表
+        type: collection
+        path: src/content/bangumi
+        format: yaml-frontmatter
+        subfolders: true
+        view:
+          primary: title
+          fields: [title, status, score, tags]
+          sort: ["title asc"]
+          search: [title, tags, comment]
+        fields:
+          - name: title
+            label: 标题
+            type: string
+            required: true
+
+          - name: name_cn
+            label: 中文名称
+            type: string
+
+          - name: status
+            label: 状态
+            type: number
+            description: 1=想看 2=在看 3=已看
+
+          - name: score
+            label: 评分
+            type: number
+
+          - name: image
+            label: 封面图
+            type: image
+
+          - name: tags
+            label: 标签
+            type: string
+            list: true
+
+          - name: comment
+            label: 评论
+            type: text
+
+          - name: published
+            label: 收藏日期
+            type: date
+            options:
+              time: false
+              format: yyyy-MM-dd
+
+          - name: link
+            label: 链接
+            type: string
+
+          - name: artist
+            label: 艺术家/作者
+            type: string
+
+          - name: enabled
+            label: 启用
+            type: boolean
+            default: true
+
+          - name: body
+            label: 详细介绍
+            type: rich-text
+
+  # ============================================================
+  # 🌴 生活记录
+  # ============================================================
+  - name: life-group
+    label: 🌴 生活记录
+    type: group
+    description: 足迹、笔记本、日常规划等生活内容
+    items:
+
+      # 足迹
+      - name: places
+        label: 🗺️ 足迹
+        type: collection
+        path: src/content/life/places
+        view:
+          primary: title
+          sort: date
+          order: desc
+        fields:
+          - name: title
+            label: 标题
+            type: string
+
+          - name: date
+            label: 日期
+            type: date
+            options:
+              time: false
+              format: yyyy-MM-dd
+
+          - name: province
+            label: 省份
+            type: string
+
+          - name: city
+            label: 城市
+            type: string
+
+          - name: lat
+            label: 纬度
+            type: number
+
+          - name: lng
+            label: 经度
+            type: number
+
+          - name: visitCount
+            label: 访问次数
+            type: number
+            default: 1
+
+          - name: experience
+            label: 体验
+            type: text
+
+          - name: description
+            label: 描述
+            type: text
+
+          - name: body
+            label: 正文
+            type: rich-text
+
+      # 笔记本
+      - name: notebooks
+        label: 📓 笔记本
+        type: collection
+        path: src/content/life/notebooks
+        subfolders: true
+        view:
+          primary: name
+        fields:
+          - name: name
+            label: 笔记本名称
+            type: string
+
+          - name: cover
+            label: 封面
+            type: image
+
+          - name: summary
+            label: 摘要
+            type: text
+
+          - name: tags
+            label: 标签
+            type: string
+            list: true
+
+          - name: body
+            label: 正文
+            type: rich-text
+
+      # 日常规划
+      - name: routines
+        label: 📅 日常规划
+        type: collection
+        path: src/content/life/routines
+        view:
+          primary: name
+          sort: order
+          order: asc
+        fields:
+          - name: name
+            label: 名称
+            type: string
+            required: true
+
+          - name: time
+            label: 时间
+            type: string
+
+          - name: icon
+            label: 图标
+            type: string
+
+          - name: color
+            label: 颜色
+            type: string
+
+          - name: description
+            label: 描述
+            type: text
+
+          - name: updatedAt
+            label: 更新日期
+            type: date
+            options:
+              time: false
+              format: yyyy-MM-dd
+
+          - name: order
+            label: 排序
+            type: number
+
+          - name: enabled
+            label: 启用
+            type: boolean
+            default: true
+
+          - name: body
+            label: 详细内容
+            type: rich-text
+
+  # ============================================================
+  # 🌐 网站导航
+  # ============================================================
+  - name: daohang-group
+    label: 🌐 网站导航
+    type: group
+    description: 网站导航收藏管理
+    items:
+
+      - name: daohang
+        label: 🌐 导航列表
+        type: collection
+        path: src/content/daohang
+        view:
+          primary: name
+          fields: [name, category, featured, order]
+          sort: ["order asc", "name asc"]
+          search: [name, description, category, tags]
+        fields:
+          - name: name
+            label: 网站名称
+            type: string
+            required: true
+
+          - name: url
+            label: 网址
+            type: string
+            required: true
+
+          - name: icon
+            label: 图标
+            type: string
+
+          - name: description
+            label: 描述
+            type: text
+
+          - name: category
+            label: 分类
+            type: string
+
+          - name: tags
+            label: 标签
+            type: string
+            list: true
+
+          - name: color
+            label: 主题色
+            type: string
+
+          - name: image
+            label: 预览图
+            type: image
+
+          - name: featured
+            label: 精选
+            type: boolean
+            default: false
+
+          - name: order
+            label: 排序
+            type: number
+
+          - name: enabled
+            label: 启用
+            type: boolean
+            default: true
+
+          - name: body
+            label: 详细介绍
+            type: rich-text
+
+  # ============================================================
+  # 🖼️ 相册管理
+  # ============================================================
+  - name: album-group
+    label: 🖼️ 相册管理
+    type: group
+    description: 相册内容和配置管理
+    items:
+
+      - name: album
+        label: 🖼️ 相册
+        type: collection
+        path: src/content/album
+        view:
+          primary: title
+          sort: date
+          order: desc
+        fields:
+          - name: title
+            label: 相册标题
+            type: string
+            required: true
+
+          - name: subtitle
+            label: 副标题
+            type: string
+
+          - name: cover
+            label: 封面图
+            type: image
+
+          - name: date
+            label: 日期
+            type: date
+            options:
+              time: false
+              format: yyyy-MM-dd
+
+          - name: location
+            label: 位置
+            type: string
+
+          - name: tags
+            label: 标签
+            type: string
+            list: true
+
+          - name: photos
+            label: 照片列表
+            type: image
+            list: true
+
+          - name: draft
+            label: 草稿
+            type: boolean
+            default: false
+
+          - name: body
+            label: 描述
+            type: rich-text
+
+  # ============================================================
+  # 👥 社交互动
+  # ============================================================
+  - name: social-group
+    label: 👥 社交互动
+    type: group
+    description: 友链、朋友圈、弹幕等社交功能配置
+    items:
+
+      - name: friends-config
+        label: 🔗 友链数据
+        type: file
+        path: src/config/friendsConfig.ts
+        format: code
+        description: 友链列表（站点名、头像、描述、链接、标签、权重）
+
+      - name: pengyou-config
+        label: 📡 朋友圈RSS
+        type: file
+        path: src/config/pengyouConfig.ts
+        format: code
+        description: 朋友圈 RSS 源配置
+
+      - name: danmu
+        label: 💬 弹幕
+        type: collection
+        path: src/content/danmu
+        view:
+          primary: nickname
+        fields:
+          - name: nickname
+            label: 昵称
+            type: string
+            required: true
+
+          - name: time
+            label: 时间
+            type: string
+
+          - name: color
+            label: 颜色
+            type: string
+
+          - name: text
+            label: 内容
+            type: text
+            required: true
+
+  # ============================================================
+  # ⚙️ 站点设置
+  # ============================================================
+  - name: site-group
+    label: ⚙️ 站点设置
+    type: group
+    description: 核心站点配置，包括标题、域名、个人信息等
+    items:
+
+      - name: site-config
+        label: 🌐 站点主配置
+        type: file
+        path: src/config/siteConfig.ts
+        format: code
+        description: 站点标题、URL、主题色、分页等核心设置
+
+      - name: profile-config
+        label: 👤 个人信息
+        type: file
+        path: src/config/profileConfig.ts
+        format: code
+        description: 头像、昵称、签名、社交链接等个人资料配置
+
+      - name: moments-config
+        label: 💭 说说页面配置
+        type: file
+        path: src/config/momentsConfig.ts
+        format: code
+        description: 说说页面封面、头像、名称、简介等配置
+
+      - name: sponsor-config
+        label: 💰 赞助配置
+        type: file
+        path: src/config/sponsorConfig.ts
+        format: code
+        description: 赞助方式、赞助者列表配置
+
+      - name: relationship-config
+        label: 💕 关系配置
+        type: file
+        path: src/config/relationshipConfig.ts
+        format: code
+        description: 情侣/朋友关系展示配置
+
+  # ============================================================
+  # 🎨 布局与外观
+  # ============================================================
+  - name: appearance-group
+    label: 🎨 布局与外观
+    type: group
+    description: 导航栏、侧边栏、壁纸、字体等视觉相关配置
+    items:
+
+      - name: nav-config
+        label: 🧭 导航栏
+        type: file
+        path: src/config/navBarConfig.ts
+        format: code
+        description: 导航栏菜单项、链接预设和搜索配置
+
+      - name: sidebar-config
+        label: 📐 侧边栏布局
+        type: file
+        path: src/config/sidebarConfig.ts
+        format: code
+        description: 侧边栏组件显示和排序配置
+
+      - name: footer-config
+        label: 📏 页脚设置
+        type: file
+        path: src/config/footerConfig.ts
+        format: code
+        description: 页脚开关控制
+
+      - name: footer-html
+        label: 📝 页脚HTML
+        type: file
+        path: src/config/FooterConfig.html
+        format: code
+        description: 页脚自定义 HTML 内容（备案号、版权信息等）
+
+      - name: font-config
+        label: 🔤 字体设置
+        type: file
+        path: src/config/fontConfig.ts
+        format: code
+        description: 全局字体、横幅字体、Google Fonts 等配置
+
+      - name: cover-config
+        label: 🖼️ 文章封面图
+        type: file
+        path: src/config/coverImageConfig.ts
+        format: code
+        description: 文章详情页封面图显示和随机图 API 配置
+
+      - name: wallpaper-config
+        label: 🏞️ 背景壁纸
+        type: file
+        path: src/config/backgroundWallpaper.ts
+        format: code
+        description: 全屏壁纸、横幅壁纸、视频背景等背景特效
+
+      - name: expressive-code-config
+        label: 💻 代码块样式
+        type: file
+        path: src/config/expressiveCodeConfig.ts
+        format: code
+        description: 代码高亮主题、折叠插件、语言徽章等配置
+
+      - name: folder-icon-config
+        label: 📁 文件夹图标
+        type: file
+        path: src/config/folderIconConfig.ts
+        format: code
+        description: 文件夹图标映射配置
+
+      - name: home-config
+        label: 🏠 首页组件
+        type: file
+        path: src/config/homePortfolioShutterConfig.ts
+        format: code
+        description: 首页百叶窗组件配置
+
+      - name: skills-config
+        label: ⚡ 技能配置
+        type: file
+        path: src/config/skillsConfig.ts
+        format: code
+        description: 技能列表和展示配置
+
+  # ============================================================
+  # 🔧 功能配置
+  # ============================================================
+  - name: feature-group
+    label: 🔧 功能配置
+    type: group
+    description: 评论、音乐、特效、打赏等功能模块配置
+    items:
+
+      - name: comment-config
+        label: 💬 评论系统
+        type: file
+        path: src/config/commentConfig.ts
+        format: code
+        description: Twikoo / Waline / Giscus / Artalk 评论系统配置
+
+      - name: music-config
+        label: 🎵 音乐播放器
+        type: file
+        path: src/config/musicConfig.ts
+        format: code
+        description: 音乐播放模式、播放列表、歌词设置
+
+      - name: calendar-config
+        label: 📆 日历配置
+        type: file
+        path: src/config/calendarConfig.ts
+        format: code
+        description: 日历页面功能配置
+
+      - name: pio-config
+        label: 🎭 看板娘
+        type: file
+        path: src/config/pioConfig.ts
+        format: code
+        description: 看板娘模型、位置、交互配置
+
+      - name: sakura-config
+        label: 🌸 樱花特效
+        type: file
+        path: src/config/sakuraConfig.ts
+        format: code
+        description: 樱花飘落动画效果配置
+
+      - name: edit-config
+        label: ✏️ 编辑功能
+        type: file
+        path: src/config/editConfig.ts
+        format: code
+        description: 在线编辑功能配置
+
+      - name: ad-config
+        label: 📢 广告配置
+        type: file
+        path: src/config/adConfig.ts
+        format: code
+        description: 广告位配置
+
+      - name: license-config
+        label: 📜 许可协议
+        type: file
+        path: src/config/licenseConfig.ts
+        format: code
+        description: 文章底部版权声明配置
+
+      - name: announcement-config
+        label: 📢 公告配置
+        type: file
+        path: src/config/announcementConfig.ts
+        format: code
+        description: 博客顶部公告栏配置
+
+      - name: category-links
+        label: 🔗 分类链接
+        type: file
+        path: src/config/categoryLinks.ts
+        format: code
+        description: 分类页链接配置
+
+      - name: projects-config
+        label: 🌐 导航配置(旧)
+        type: file
+        path: src/config/projectsConfig.ts
+        format: code
+        description: 旧版网站导航配置
+
+      - name: album-config
+        label: 🖼️ 相册配置
+        type: file
+        path: src/config/albumConfig.ts
+        format: code
+        description: 相册页面布局和功能配置
+
+      - name: places-config
+        label: 🗺️ 足迹配置
+        type: file
+        path: src/config/placesConfig.ts
+        format: code
+        description: 足迹地图页面配置
+
+      - name: notebooks-config
+        label: 📓 笔记本配置
+        type: file
+        path: src/config/notebooksConfig.ts
+        format: code
+        description: 笔记本页面配置

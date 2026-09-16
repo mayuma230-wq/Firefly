@@ -1,14 +1,15 @@
 # build output
 dist/
 
-# generated vndb covers
-public/vndb-covers/
+# backup files
+_backup/
 
 # generated types
 .astro/
 
 # dependencies
 node_modules/
+.pnpm-store/
 
 # logs
 npm-debug.log*
@@ -32,18 +33,21 @@ yarn.lock
 # ide
 .idea
 *.iml
+.claude
 
 # docs
 Firefly-docs/
 
-# lite 版本
-Firefly-Lite/
-
 cache/
 package/
 .obsidian/
+.trae/
 
-# vibe coding
-.codex*
-.claude
-.mimocode
+# committed build artifacts
+posts.html
+
+
+
+# AI 摘要补全脚本（包含 API 密钥，不上传 GitHub）
+scripts/fill-descriptions/index.ts
+

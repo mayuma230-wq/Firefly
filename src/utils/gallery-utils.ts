@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { GalleryAlbum } from "@/types/config";
+import type { GalleryAlbum } from "@/config/galleryConfig";
 import { url } from "@/utils/url-utils";
 
 function withBase(assetPath: string): string {

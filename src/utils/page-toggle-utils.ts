@@ -1,4 +1,4 @@
-import type { SiteConfig } from "@/types/siteConfig";
+import type { SiteConfig } from "@/types/config";
 
 // 页面开关的环境变量覆盖工具
 // 把「环境变量开启/关闭页面」的逻辑收敛在这里，让 siteConfig.ts 保持纯配置

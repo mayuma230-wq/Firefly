@@ -1,49 +1,104 @@
-import type { ProfileConfig } from "../types/profileConfig";
+import type { ProfileConfig } from "../types/config";
 
 export const profileConfig: ProfileConfig = {
-	// 头像
+	// ============================================================
+	// 头像设置
+	// ============================================================
 	// 图片路径支持三种格式：
 	// 1. public 目录（以 "/" 开头，不优化）："/assets/images/avatar.webp"
-	// 2. src 目录（不以 "/" 开头，自动优化但会增加构建时间，推荐）："assets/images/avatar.webp"
+	// 2. src 目录（不以 "/"开头，自动优化但会增加构建时间，推荐）："assets/images/avatar.webp"
 	// 3. 远程 URL："https://example.com/avatar.jpg"
-	avatar: "assets/images/avatar.avif",
+	avatar: "/assets/images/avatar.svg",
 
-	// 名字
-	name: "XiaYe",
+	// 下班时间头像（为空则始终使用上方 avatar）
+	avatarOffWork: "assets/images/xiaban.gif",
 
-	// 个人签名
-	bio: "Hello, I'm XiaYe.",
+	name: "马俊宇", // 名字
 
+	// 首页展示名字（留空则使用 name）
+	displayName: "马俊宇的博客",
+
+	// 职业/身份标签
+	occupation: "[啥都不会 / 无技术博主]",
+
+	// ============================================================
+	// 个人签名设置
+	// ============================================================
+	// 支持多条，会循环打字+删除效果
+	bio: ["躬身入局，心为主理，行有尺度，自持本心."],
+
+	// ============================================================
 	// 链接配置
-	// 已经预装的图标集：fa7-brands，fa7-regular，fa7-solid，material-symbols，simple-icons
-	// 访问https://icones.js.org/ 获取图标代码，
-	// 如果想使用尚未包含相应的图标集，则需要安装它
-	// `pnpm add @iconify-json/<icon-set-name>`
-	// showName: true 时显示图标和名称，false 时只显示图标
+	// 已预装图标集：fa7-brands、fa7-regular、fa7-solid、material-symbols、simple-icons
+	// 访问 https://icones.js.org/ 获取图标代码
+	// 如需使用未预装的图标集，执行：pnpm add @iconify-json/<icon-set-name>
+	// showName: true 显示图标和名称，false 只显示图标
+	// ============================================================
 	links: [
 		{
-			name: "GitHub",
-			icon: "fa7-brands:github",
-			url: "https://github.com/CuteLeaf",
-			showName: false,
-		},
-		{
 			name: "Email",
-			icon: "fa7-solid:envelope",
-			url: "mailto:xiaye@msn.com",
+			icon: "material-symbols:mail-outline",
+			url: "mailto:3242622523@qq.com",
 			showName: false,
 		},
 		{
 			name: "RSS",
-			icon: "fa7-solid:rss",
+			icon: "material-symbols:rss-feed",
 			url: "/rss/",
 			showName: false,
 		},
-		{
-			name: "Atom",
-			icon: "fa7-solid:atom",
-			url: "/atom/",
-			showName: false,
-		},
 	],
+
+	// ============================================================
+	// 首页 Hero 区域配置
+	// true = 显示，false = 隐藏
+	// ============================================================
+	homeHero: {
+		// ---------- 头像 ----------
+		showAvatar: false, // 左侧圆形头像
+		// 头像位置：default=默认（左侧面板里），bottom-left=左下角，bottom-right=右下角
+		avatarPosition: "bottom-right",
+		showWorkStatus: true, // 头像右下角工作状态徽章（上班中/下班了）
+
+		// ---------- 名字 ----------
+		showDisplayName: true, // 首页大标题（配合 displayName 使用）
+		showVerticalName: true, // 竖排名字（配合 name 使用）
+
+		// ---------- 职业/身份标签 ----------
+		showOccupation: true,
+
+		// ---------- B站徽章 ----------
+		showBilibiliBadge: false, // 名字下方 B站徽章（用户要求不显示 B站信息）
+		bilibiliBadgeText: "",
+
+		// ---------- 个人签名 ----------
+		showBio: true,
+
+		// ---------- 胶囊标签 ----------
+		showPill: true, // 右上角胶囊标签
+		pillText: "BLOG",
+
+		// ---------- 竖排标题 ----------
+		showVerticalTitle: true,
+		verticalTitle: "博客",
+
+		// ---------- 竖排创意标签 ----------
+		showVerticalCreative: true,
+		verticalCreative: "CREATIVE",
+
+		// ---------- 底部日文小文字 ----------
+		showFooterText: true,
+		footerText: "システム起動完了",
+
+		// ---------- 主页右侧角色人物图 ----------
+		showCharacter: false,
+
+		// ---------- 右侧磨砂玻璃卡片 ----------
+		showArtWindow: false, // 右下角透明玻璃矩形框
+
+		// ---------- 角色对话气泡 ----------
+		showSpeech: true,
+		speechChinese: "你好，随意逛逛吧",
+		speechEnglish: "Welcome to my blog, enjoy your stay!",
+	},
 };

@@ -1,73 +1,52 @@
 ---
 import GoogleAnalytics from "@components/analytics/GoogleAnalytics.astro";
-import La51Analytics from "@components/analytics/La51Analytics.astro";
 import MicrosoftClarity from "@components/analytics/MicrosoftClarity.astro";
 import UmamiAnalytics from "@components/analytics/UmamiAnalytics.astro";
-import CodeGroupManager from "@components/features/CodeGroupManager.astro";
+import {
+	REGION_BLOCKED_COUNTRY_CODES,
+	REGION_BLOCKED_PAGES,
+} from "../config/regionBlockConfig";
+import SearchModal from "@components/controls/SearchModal.svelte";
 import FancyboxManager from "@components/features/FancyboxManager.astro";
-import FontSetup from "@components/features/FontSetup.astro";
-import GithubCardManager from "@components/features/GithubCardManager.astro";
+import FloatingLyrics from "@components/features/FloatingLyrics.astro";
+import FontManager from "@components/features/FontManager.astro";
 import MusicManager from "@components/features/MusicManager.astro";
-import MusicPlayerView from "@components/features/MusicPlayerView.astro";
+import PageLoader from "@components/features/PageLoader.astro";
 import SakuraEffect from "@components/features/SakuraEffect.astro";
-import WavesEffect from "@components/features/WavesEffect.astro";
 import ConfigCarrier from "@components/layout/ConfigCarrier.astro";
+import MobileDock from "@components/layout/MobileDock.astro";
 
 import {
-	analyticsConfig,
 	backgroundWallpaper,
-	displaySettingsConfig,
 	expressiveCodeConfig,
-	musicPlayerConfig,
-	navbarMode,
 	profileConfig,
 	siteConfig,
 } from "@/config";
 import {
 	BANNER_HEIGHT,
+	BANNER_HEIGHT_EXTEND,
 	BANNER_HEIGHT_HOME,
-	BANNER_HEIGHT_NON_HOME,
-	BANNER_HEIGHT_NON_HOME_MIN,
 	PAGE_WIDTH,
 } from "@/constants/constants";
 import { defaultFavicons } from "@/constants/icon";
 import type { Favicon } from "@/types/config";
-import { isHomePage } from "@/utils/layout-utils";
-import { getAuthorAvatarUrl, getSiteLogo } from "@/utils/schema-image";
-import { buildSiteGraph, toAbsoluteUrl } from "@/utils/schema-utils";
-import { getOgLocale } from "@/utils/site-config-utils";
-import { getCanonicalUrl, url } from "@/utils/url-utils";
+import { getDefaultBackground, isHomePage } from "@/utils/layout-utils";
+import { url } from "@/utils/url-utils";
 
 import "@/styles/main.css";
-import "@/styles/immersive-reading.css";
-import "@/styles/variables.styl";
 import "@rehype-callouts-theme";
 
 interface Props {
 	title?: string;
+	banner?: string;
 	description?: string;
 	lang?: string;
 	setOGTypeArticle?: boolean;
 	postSlug?: string;
-	postCoverImage?: string;
-	ogImageWidth?: number;
-	ogImageHeight?: number;
-	ogImageAlt?: string;
-	hasWallpaper?: boolean;
 }
 
-let {
-	title,
-	description,
-	lang,
-	setOGTypeArticle,
-	postSlug,
-	postCoverImage,
-	ogImageWidth: propsOgImageWidth,
-	ogImageHeight: propsOgImageHeight,
-	ogImageAlt: propsOgImageAlt,
-	hasWallpaper = false,
-} = Astro.props;
+let { title, banner, description, lang, setOGTypeArticle, postSlug } =
+	Astro.props;
 
 // apply a class to the body element to decide the height of the banner, only used for initial page load
 // Swup can update the body for each page visit, but it's after the page transition, causing a delay for banner height change
@@ -78,26 +57,21 @@ const isHomePageCheck = isHomePage(Astro.url.pathname);
 // why doing this in Layout instead of GlobalStyles: https://github.com/withastro/astro/issues/6728#issuecomment-1502203757
 const configHue = siteConfig.themeColor.hue;
 
-// 获取导航栏透明模式配置（banner 模式专属）
+// 获取导航栏透明模式配置
 const navbarTransparentMode =
 	backgroundWallpaper.banner?.navbar?.transparentMode || "semi";
-// 判断是否应该显示顶部高光效果（只在 semifull 动态透明模式下显示）
-const shouldShowTopHighlight = navbarTransparentMode === "semifull";
+// 判断是否应该显示顶部高光效果（只在full和semifull模式下显示）
+const shouldShowTopHighlight =
+	navbarTransparentMode === "full" || navbarTransparentMode === "semifull";
 
-// 全屏壁纸布局：classic 为文档流旧版，hero 为固定首屏新版
-const fullscreenLayout = backgroundWallpaper.fullscreen?.layout ?? "classic";
+if (!banner || typeof banner !== "string" || banner.trim() === "") {
+	banner = getDefaultBackground();
+}
 
-// 子菜单 / 浮动面板的毛玻璃模糊度：跟随 navbar.blur，但不受壁纸模式影响，
-// 且带一个最小值 —— 导航栏可以用 blur: 0 关掉毛玻璃，面板则始终保留毛玻璃。
-// 之所以不复用 #navbar 上的 --navbar-glass-blur：
-// setting-utils.ts 的 updateNavbarTransparency() 会在切到 overlay / none 模式时
-// 把它清成 0px；这里放到 :root 上，同时也能让不在导航栏 DOM 内的
-// .float-panel（#translate-panel、#mobile-toc-panel）继承到。
-const NAVBAR_PANEL_MIN_BLUR = 2;
-const navbarPanelBlur = Math.max(
-	backgroundWallpaper.banner?.navbar?.blur ?? 20,
-	NAVBAR_PANEL_MIN_BLUR,
-);
+// TODO don't use post cover as banner for now
+banner = getDefaultBackground();
+
+const enableBanner = backgroundWallpaper.mode === "banner";
 
 let pageTitle: string;
 if (title) {
@@ -108,11 +82,13 @@ if (title) {
 		: siteConfig.title;
 }
 
+let ogImageUrl: string | undefined;
+if (siteConfig.generateOgImages && postSlug) {
+	ogImageUrl = new URL(`/og/${postSlug}.png`, Astro.site).toString();
+}
+
 const favicons: Favicon[] =
 	siteConfig.favicon.length > 0 ? siteConfig.favicon : defaultFavicons;
-// apple-touch-icon：优先取 favicon 中的 png，否则取第一个
-const appleTouchIcon =
-	favicons.find((f) => f.src.toLowerCase().endsWith(".png")) ?? favicons[0];
 
 // const siteLang = siteConfig.lang.replace('_', '-')
 if (!lang) {
@@ -120,71 +96,23 @@ if (!lang) {
 }
 const siteLang = lang.replace("_", "-");
 
-// 首页站点级结构化数据用的作者头像 URL（Person.image），经 toAbsoluteImageUrl 三分解析
-const avatarUrl = await getAuthorAvatarUrl();
-// 作者个人页（/about/）绝对 URL，作为 Person.url
-const aboutUrl =
-	toAbsoluteUrl("/about/", siteConfig.site_url) ?? siteConfig.site_url;
-// 站点 publisher logo（Organization.logo），用于首页 @graph 的 Organization 节点
-const siteLogo = await getSiteLogo();
-
-// canonical：对 /archive/ 与 /search/ 剥离查询串，避免筛选视图自我 canonical 到 ?tag= 等
-const canonicalUrl = getCanonicalUrl(Astro.url);
-
-// OG 图片：文章走生成图/封面，非文章页回退到站点 logo
-let ogImageUrl: string | undefined;
-let ogImageWidth: number | undefined;
-let ogImageHeight: number | undefined;
-const isGeneratedOg = siteConfig.post.generateOgImages && postSlug;
-if (isGeneratedOg) {
-	ogImageUrl = new URL(`/og/${postSlug}.png`, Astro.site).toString();
-	ogImageWidth = 1200;
-	ogImageHeight = 630;
-} else if (postCoverImage) {
-	ogImageUrl = postCoverImage; // 已由文章页算成绝对 URL
-	ogImageWidth = propsOgImageWidth;
-	ogImageHeight = propsOgImageHeight;
-} else if (siteLogo?.url) {
-	ogImageUrl = siteLogo.url;
-	ogImageWidth = siteLogo.width;
-	ogImageHeight = siteLogo.height;
-}
-const ogImageAlt = propsOgImageAlt ?? pageTitle;
-
 // 使用固定的banner偏移量，position配置用于图片定位
 ---
 
 <!doctype html>
-<html lang={siteLang} class="bg-(--page-bg) text-[14px] md:text-[16px]" data-wallpaper-mode={backgroundWallpaper.mode} data-fullscreen-layout={fullscreenLayout} data-has-wallpaper={hasWallpaper ? "" : undefined} data-tag-style={siteConfig.tagStyle ?? "pill"} data-category-style={siteConfig.categoryStyle ?? "rectangle"}>
+<html lang={siteLang} class:list={["bg-(--page-bg) text-[14px] md:text-[16px]", {"is-navigating-to-music": Astro.url.pathname === "/music/" || Astro.url.pathname === "/music", "dark": Astro.url.pathname === "/music/" || Astro.url.pathname === "/music"}]}>
   <head>
     <meta charset="UTF-8" />
-    <style is:inline>
-			@layer properties, theme, base, components, utilities;
-		</style>
-    {analyticsConfig?.googleAnalyticsId && (
-            <GoogleAnalytics analyticsId={analyticsConfig.googleAnalyticsId} />
+    {siteConfig.analytics?.googleAnalyticsId && (
+            <GoogleAnalytics analyticsId={siteConfig.analytics.googleAnalyticsId} />
     )}
-    {analyticsConfig?.microsoftClarityId && (
-            <MicrosoftClarity clarityId={analyticsConfig.microsoftClarityId} />
+    {siteConfig.analytics?.microsoftClarityId && (
+            <MicrosoftClarity clarityId={siteConfig.analytics.microsoftClarityId} />
     )}
-        {analyticsConfig?.umamiAnalytics?.websiteId && (
-          <UmamiAnalytics
-          websiteId={analyticsConfig.umamiAnalytics.websiteId}
-          scriptUrl={analyticsConfig.umamiAnalytics.scriptUrl}
-          replaysScriptUrl={analyticsConfig.umamiAnalytics.replaysScriptUrl}
-          trackOutboundLinks={analyticsConfig.umamiAnalytics.trackOutboundLinks}
-          collectWebVitals={analyticsConfig.umamiAnalytics.collectWebVitals}
-          replays={analyticsConfig.umamiAnalytics.replays}
-          />
-        )}
-        {analyticsConfig?.la51Analytics?.Id && (
-            <La51Analytics
-            analyticsId={analyticsConfig.la51Analytics.Id}
-            sdkUrl={analyticsConfig.la51Analytics?.sdkUrl}
-            ck={analyticsConfig.la51Analytics?.ck}
-            autoTrack={analyticsConfig.la51Analytics?.autoTrack}
-            hashMode={analyticsConfig.la51Analytics?.hashMode}
-            screenRecord={analyticsConfig.la51Analytics?.screenRecord}
+    {siteConfig.analytics?.umamiAnalytics?.websiteId && (
+            <UmamiAnalytics
+                websiteId={siteConfig.analytics.umamiAnalytics.websiteId}
+                scriptUrl={siteConfig.analytics.umamiAnalytics.scriptUrl}
             />
     )}
 
@@ -200,21 +128,14 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
     }
     <meta name="author" content={profileConfig.name} />
 
-    <link rel="canonical" href={canonicalUrl} />
     <meta property="og:site_name" content={siteConfig.title} />
-    <meta property="og:locale" content={getOgLocale(lang)} />
-    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:url" content={Astro.url} />
     <meta property="og:title" content={pageTitle} />
     <meta
       property="og:description"
       content={description || siteConfig.description || pageTitle}
     />
     {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
-    {ogImageUrl && ogImageWidth && <meta property="og:image:width" content={String(ogImageWidth)} />}
-    {ogImageUrl && ogImageHeight && <meta property="og:image:height" content={String(ogImageHeight)} />}
-    {ogImageUrl && <meta property="og:image:alt" content={ogImageAlt} />}
-    {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
-    {ogImageUrl && <meta name="twitter:image:alt" content={ogImageAlt} />}
     {
       setOGTypeArticle ? (
         <meta property="og:type" content="article" />
@@ -224,36 +145,23 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
     }
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content={canonicalUrl} />
+    <meta property="twitter:url" content={Astro.url} />
     <meta name="twitter:title" content={pageTitle} />
     <meta
       name="twitter:description"
       content={description || siteConfig.description || pageTitle}
     />
 
-    {
-      isHomePageCheck && (
-        <script
-          is:inline
-          type="application/ld+json"
-          set:html={JSON.stringify(
-            buildSiteGraph({
-              site: siteConfig.site_url,
-              siteConfig,
-              profileConfig,
-              lang: siteLang,
-              authorUrl: aboutUrl,
-              avatarUrl,
-              logo: siteLogo,
-            }),
-          )}
-        />
-      )
-    }
-
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
-    <meta name="theme-color" content={`hsl(${siteConfig.themeColor.hue} 90% 60%)`} />
+
+    <!-- 搜索引擎验证标签 -->
+    <!-- 百度搜索资源平台验证 -->
+    <meta name="baidu-site-verification" content="codeva-lX6hLCrOOy" />
+    <!-- 必应搜索验证 -->
+    <meta name="msvalidate.01" content="63A6A0006140D3F4ABB55B84399CF4D9" />
+    <!-- Google Search Console 验证 -->
+    <meta name="google-site-verification" content="tvwv6vQVhWKlXottwniAcT3JKdgiBN7xLRWoh7zewyY" />
     {
       favicons.map((favicon) => (
         <link
@@ -264,98 +172,83 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
         />
       ))
     }
-    {appleTouchIcon && (
-      <link
-        rel="apple-touch-icon"
-        href={appleTouchIcon.src.startsWith("/") ? url(appleTouchIcon.src) : appleTouchIcon.src}
-        type="image/png"
-        sizes={appleTouchIcon.sizes}
-      />
-    )}
 
-    <!-- 为特定域名的图片添加 referrerpolicy 以解决 403 问题 -->
-    <!-- 注：静态图片（ImageWrapper 组件、Markdown 正文图）已在构建期加好 referrerpolicy；
-         此脚本仅作为运行时兜底，处理动态注入的图片（解密内容、第三方评论/统计部件等）。 -->
-    {siteConfig.imageOptimization?.noReferrerDomains &&
-     siteConfig.imageOptimization.noReferrerDomains.length > 0 && (
-      <script
-        is:inline
-        define:vars={{
-          noReferrerDomains: JSON.stringify(
-            siteConfig.imageOptimization.noReferrerDomains
-          ),
-        }}
-      >
-        (function() {
-          const domains = JSON.parse(noReferrerDomains);
-
-          // 域名匹配函数，支持通配符
-          function matchesDomain(urlStr, patterns) {
-            try {
-              const urlObj = new URL(urlStr);
-              const hostname = urlObj.hostname;
-
-              return patterns.some(function(pattern) {
-                const regexPattern = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*');
-                const regex = new RegExp('^' + regexPattern + '$');
-                return regex.test(hostname);
-              });
-            } catch (e) {
-              return false;
+    <!-- 中国大陆访问者隐藏配置页面入口（真正拦截在 functions/ 边缘函数层） -->
+    <script
+      is:inline
+      define:vars={{
+        regionPages: REGION_BLOCKED_PAGES,
+        regionCountries: REGION_BLOCKED_COUNTRY_CODES,
+      }}
+    >
+      (function () {
+        // 先按浏览器时区预判，避免闪烁；随后用边缘探测接口按真实 IP 校准
+        var styleInjected = false;
+        function markRegion(isBlocked) {
+          if (isBlocked) {
+            document.documentElement.setAttribute("data-region-cn", "1");
+            if (!styleInjected) {
+              styleInjected = true;
+              var css = regionPages
+                .map(function (page) {
+                  return 'html[data-region-cn="1"] a[href*="/' + page + '"]';
+                })
+                .join(",");
+              document.head.insertAdjacentHTML(
+                "beforeend",
+                "<style>" + css + "{display:none!important}</style>",
+              );
             }
+          } else {
+            document.documentElement.removeAttribute("data-region-cn");
           }
-
-          // 处理单个图片元素
-          function processImage(img) {
-            if (!img.src || img.hasAttribute('referrerpolicy')) return;
-
-            if (matchesDomain(img.src, domains)) {
-              img.setAttribute('referrerpolicy', 'no-referrer');
-            }
-          }
-
-          // 兜底扫描一次当前页面（构建期已处理的图片会因已有属性而快速跳过）
-          document.querySelectorAll('img').forEach(processImage);
-
-          // 使用 MutationObserver 监听动态加载/注入的图片
-          const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-              mutation.addedNodes.forEach(function(node) {
-                if (node.nodeName === 'IMG') {
-                  processImage(node);
-                }
-                if (node.querySelectorAll) {
-                  node.querySelectorAll('img').forEach(processImage);
-                }
-              });
+        }
+        try {
+          var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+          var tzHit =
+            regionCountries.indexOf("CN") >= 0 &&
+            /^Asia\/(Shanghai|Chongqing|Harbin|Urumqi|Kashgar)$/i.test(tz);
+          if (tzHit) markRegion(true);
+        } catch (e) {
+          /* 忽略不支持时区 API 的环境 */
+        }
+        // IP 精确校准：探测接口返回访问者真实国家码（挂代理/时区不符的
+        // 访问者也会被纠正）；接口不可用时保留时区预判结果
+        try {
+          fetch(new URL("region", document.baseURI).toString(), {
+            cache: "no-store",
+          })
+            .then(function (r) {
+              return r.ok ? r.json() : null;
+            })
+            .then(function (d) {
+              if (d && d.region) {
+                markRegion(regionCountries.indexOf(d.region) >= 0);
+              }
+            })
+            .catch(function () {
+              /* 探测失败保持时区预判 */
             });
-          });
-
-          observer.observe(document.documentElement, {
-            childList: true,
-            subtree: true
-          });
-        })();
-      </script>
-    )}
+        } catch (e) {
+          /* 忽略 */
+        }
+      })();
+    </script>
 
     <!-- Set the theme before the page is rendered to avoid a flash -->
     <script
       is:inline
       define:vars={{
+        BANNER_HEIGHT_EXTEND,
         PAGE_WIDTH,
         configHue,
         defaultMode: siteConfig.themeColor.defaultMode ?? "light",
         defaultWallpaperMode: backgroundWallpaper.mode,
         isWallpaperSwitchable:
-          displaySettingsConfig.wallpaperModeSwitchable,
-        isFullscreenLayoutSwitchable:
-          displaySettingsConfig.fullscreenLayoutSwitchable,
+          backgroundWallpaper.switchable ?? true,
         darkTheme: expressiveCodeConfig.darkTheme,
         lightTheme: expressiveCodeConfig.lightTheme,
         baseUrl: import.meta.env.BASE_URL,
-        cardTransparentOpacity: backgroundWallpaper.overlay?.cardOpacity ?? 0.6,
-        fullscreenLayout,
       }}
     >
       // 主题初始化 - 与setting-utils.ts保持一致
@@ -401,33 +294,53 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
       const hue = localStorage.getItem("hue") || configHue;
       document.documentElement.style.setProperty("--hue", hue);
 
-      // 设置卡片透明度（全屏透明模式下使用），优先使用用户自定义值
-      const storedCardOpacity = localStorage.getItem("overlayCardOpacity");
-      const parsedCardOpacity = storedCardOpacity === null ? NaN : Number.parseFloat(storedCardOpacity);
-      const resolvedCardOpacity = Number.isFinite(parsedCardOpacity)
-        ? Math.min(1, Math.max(0, parsedCardOpacity))
-        : cardTransparentOpacity;
-      document.documentElement.style.setProperty("--card-transparent-opacity", String(resolvedCardOpacity));
+      // Load text glow strength (夜晚模式文字发光亮度 0-1)
+      const storedGlow = localStorage.getItem("textGlowStrength");
+      const textGlowStrength = storedGlow !== null ? Number.parseFloat(storedGlow) : 0.5;
+      const safeGlow = Number.isFinite(textGlowStrength) ? Math.max(0, Math.min(1, textGlowStrength)) : 0.5;
+      document.documentElement.style.setProperty("--text-glow-strength", String(safeGlow));
 
-      // 仅在允许切换时使用设置面板保存的运行时选择；否则配置值始终生效
-      const storedFullscreenLayout = isFullscreenLayoutSwitchable
-        ? localStorage.getItem("fullscreenLayout")
-        : null;
-      if (!isFullscreenLayoutSwitchable) {
-        localStorage.removeItem("fullscreenLayout");
+      // calculate the --banner-height-extend, which needs to be a multiple of 4 to avoid blurry text
+      // 使用更准确的窗口高度计算
+      function calculateBannerHeightExtend() {
+        let offset = Math.floor(
+          window.innerHeight * (BANNER_HEIGHT_EXTEND / 100)
+        );
+        offset = offset - (offset % 4);
+        document.documentElement.style.setProperty(
+          "--banner-height-extend",
+          `${offset}px`
+        );
       }
-      const resolvedFullscreenLayout =
-        storedFullscreenLayout === "hero" || storedFullscreenLayout === "classic"
-          ? storedFullscreenLayout
-          : fullscreenLayout;
-      document.documentElement.setAttribute(
-        "data-fullscreen-layout",
-        resolvedFullscreenLayout,
-      );
 
-      // 内容定位已由 --content-top 纯 CSS 决定（layout-base.css），无需 --banner-height-extend 变量/计算
+      // 立即设置初始值
+      calculateBannerHeightExtend();
 
-      // 初始化壁纸模式 - 在页面渲染前同步应用（其余布局由 CSS 属性选择器接管）
+      // 在下一帧重新计算精确值（仅在值变化时更新，避免闪烁）
+      requestAnimationFrame(() => {
+        const oldValue = parseInt(
+          document.documentElement.style.getPropertyValue(
+            "--banner-height-extend"
+          )
+        );
+        calculateBannerHeightExtend();
+        const newValue = parseInt(
+          document.documentElement.style.getPropertyValue(
+            "--banner-height-extend"
+          )
+        );
+        // 如果值变化了，再更新一次确保准确
+        if (Math.abs(oldValue - newValue) > 4) {
+          // 如果有明显变化，延迟一帧再更新，避免闪烁
+          requestAnimationFrame(calculateBannerHeightExtend);
+        }
+      });
+
+      // 初始化壁纸模式 - 在页面渲染前应用
+      const WALLPAPER_BANNER = "banner";
+      const WALLPAPER_OVERLAY = "overlay";
+      const WALLPAPER_NONE = "none";
+      const WALLPAPER_FULLSCREEN = "fullscreen";
       const wallpaperMode = isWallpaperSwitchable
         ? localStorage.getItem("wallpaperMode") || defaultWallpaperMode
         : defaultWallpaperMode;
@@ -438,33 +351,148 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
         wallpaperMode
       );
 
-      // 初始化期间禁用 content-panel/wrapper 过渡，避免加载时布局/变量变化产生内容移动动画；
-      // load 后移除（仅首次设置，swup 切页重跑脚本时不再重复）。布局已由 CSS 接管，无需 rAF 校正
-      if (!window.__fireflyLayoutTransitionGuard) {
-        window.__fireflyLayoutTransitionGuard = true;
-        document.documentElement.setAttribute("data-layout-init", "");
-        const removeLayoutInit = () =>
-          document.documentElement.removeAttribute("data-layout-init");
-        if (document.readyState === "complete") {
-          requestAnimationFrame(removeLayoutInit);
+      // 立即执行函数来处理DOM - 移除 requestAnimationFrame 以避免页面闪烁
+      (function applyWallpaperMode() {
+        // 检查当前是否为首页
+        const isHomePage =
+          window.location.pathname === baseUrl ||
+          (baseUrl !== '/' && window.location.pathname === baseUrl.replace(/\/$/, '')) ||
+          window.location.pathname === "/";
+
+        const applyToBody = () => {
+          if (!document.body) return;
+
+          // 根据模式隐藏显示对应元素
+          if (
+            wallpaperMode === WALLPAPER_NONE ||
+            wallpaperMode === WALLPAPER_OVERLAY
+          ) {
+            document.body.classList.remove("enable-banner");
+            document.body.classList.add("no-banner-layout");
+          } else if (wallpaperMode === WALLPAPER_FULLSCREEN) {
+            document.body.classList.add("enable-banner");
+            document.body.classList.remove("no-banner-layout");
+          } else {
+            document.body.classList.add("enable-banner");
+            document.body.classList.remove("no-banner-layout");
+          }
+
+          // 全屏壁纸透明模式
+          if (wallpaperMode === WALLPAPER_OVERLAY) {
+            document.body.classList.add("wallpaper-transparent");
+          } else {
+            document.body.classList.remove("wallpaper-transparent");
+          }
+        };
+
+        // 立即尝试应用 body 类，如果 body 还未就绪则等待 DOMContentLoaded
+        if (document.body) {
+          applyToBody();
         } else {
-          window.addEventListener("load", removeLayoutInit, { once: true });
+          document.addEventListener("DOMContentLoaded", applyToBody, { once: true });
         }
-      }
+
+        // 处理 wallpaper-wrapper 的显示
+        const wallpaperWrapper = document.getElementById("wallpaper-wrapper");
+
+        if (wallpaperMode === WALLPAPER_OVERLAY) {
+          // 全屏壁纸透明模式：切换为 overlay 显示
+          if (wallpaperWrapper) {
+            wallpaperWrapper.classList.add("wallpaper-overlay");
+            wallpaperWrapper.classList.remove("wallpaper-fullscreen");
+            wallpaperWrapper.style.display = "block";
+            wallpaperWrapper.classList.remove("hidden", "opacity-0", "mobile-hide-banner");
+            wallpaperWrapper.classList.add("opacity-100");
+            wallpaperWrapper.style.top = "";
+          }
+        } else if (wallpaperMode === WALLPAPER_FULLSCREEN) {
+          // 全屏壁纸模式：壁纸铺满全屏
+          if (wallpaperWrapper) {
+            wallpaperWrapper.classList.remove("wallpaper-overlay");
+            wallpaperWrapper.classList.add("wallpaper-fullscreen");
+            if (isHomePage) {
+              // 首页：隐藏 wallpaper-wrapper（首页用影像揭示层）
+              wallpaperWrapper.style.setProperty("display", "none", "important");
+            } else {
+              // 非首页：显示壁纸，铺满全屏
+              wallpaperWrapper.style.setProperty("display", "block", "important");
+              wallpaperWrapper.style.top = "";
+              wallpaperWrapper.classList.remove("hidden", "opacity-0", "mobile-hide-banner");
+              wallpaperWrapper.classList.add("opacity-100");
+            }
+          }
+        } else if (wallpaperMode === WALLPAPER_NONE) {
+          // 纯色背景：隐藏壁纸
+          if (wallpaperWrapper) {
+            wallpaperWrapper.classList.remove("wallpaper-overlay", "wallpaper-fullscreen");
+            wallpaperWrapper.style.display = "none";
+            wallpaperWrapper.classList.add("hidden", "opacity-0");
+          }
+        } else {
+          // banner模式：以 banner 方式显示
+          if (wallpaperWrapper) {
+            wallpaperWrapper.classList.remove("wallpaper-overlay", "wallpaper-fullscreen");
+            const isMobile = window.innerWidth < 1024;
+            // 移动端非首页时隐藏banner（初始状态直接隐藏，不需要动画）
+            // 桌面端始终显示banner
+            if (isMobile && !isHomePage) {
+              wallpaperWrapper.style.display = "none";
+              wallpaperWrapper.classList.add("mobile-hide-banner");
+            } else {
+              wallpaperWrapper.style.display = "block";
+              wallpaperWrapper.classList.remove("mobile-hide-banner");
+            }
+          }
+        }
+
+        // 处理主内容区域位置
+        const mainContentWrapper = document.querySelector(
+          ".absolute.w-full.z-30"
+        );
+        if (mainContentWrapper) {
+          const isMobile = window.innerWidth < 1024;
+          // 只在移动端非首页时调整主内容位置
+          if (isMobile && !isHomePage) {
+            mainContentWrapper.classList.add("mobile-main-no-banner");
+          } else {
+            mainContentWrapper.classList.remove("mobile-main-no-banner");
+          }
+        }
+
+        // 处理credit元素
+        const creditDesktop = document.getElementById(
+          "banner-credit-desktop"
+        );
+        const creditMobile = document.getElementById("banner-credit-mobile");
+        if (
+          wallpaperMode === WALLPAPER_OVERLAY ||
+          wallpaperMode === WALLPAPER_NONE
+        ) {
+          if (creditDesktop) creditDesktop.style.display = "none";
+          if (creditMobile) creditMobile.style.display = "none";
+        } else {
+          if (creditDesktop) creditDesktop.style.display = "";
+          if (creditMobile) creditMobile.style.display = "";
+        }
+
+        // 处理banner homeText元素
+        const bannerTextOverlay = document.querySelector(
+          ".banner-home-text-overlay"
+        );
+        if (bannerTextOverlay) {
+          if (wallpaperMode === WALLPAPER_BANNER && isHomePage) {
+            bannerTextOverlay.classList.remove("hidden");
+          } else {
+            bannerTextOverlay.classList.add("hidden");
+          }
+        }
+      })();
 
       // 初始化水波纹动画状态 - 在 html 元素上设置属性，CSS 会立即生效
       (function applyWavesEnabled() {
         const wavesEnabled = localStorage.getItem("wavesEnabled");
         if (wavesEnabled !== null) {
           document.documentElement.setAttribute("data-waves-enabled", wavesEnabled);
-        }
-      })();
-
-      // 初始化渐变过渡状态 - 在 html 元素上设置属性，CSS 会立即生效
-      (function applyGradientEnabled() {
-        const gradientEnabled = localStorage.getItem("gradientEnabled");
-        if (gradientEnabled !== null) {
-          document.documentElement.setAttribute("data-gradient-enabled", gradientEnabled);
         }
       })();
 
@@ -475,15 +503,20 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
           document.documentElement.setAttribute("data-banner-title-enabled", bannerTitleEnabled);
         }
       })();
+
+      // Initialize hide-covers state before first paint
+      (function applyHideCovers() {
+        const hideCovers = localStorage.getItem("hideCovers");
+        // 默认隐藏封面（首次访问或明确设置为 true）
+        if (hideCovers !== "false") {
+          document.documentElement.setAttribute("data-hide-covers", "true");
+        }
+      })();
     </script>
     <style
       define:vars={{
         configHue,
         "page-width": `${siteConfig.pageWidth ?? PAGE_WIDTH}rem`,
-        "navbar-panel-blur": `${navbarPanelBlur}px`,
-        "banner-height-home": `${BANNER_HEIGHT_HOME}vh`,
-        "banner-height-non-home": `max(${BANNER_HEIGHT_NON_HOME}vh, ${BANNER_HEIGHT_NON_HOME_MIN}px)`,
-        "banner-height": `${BANNER_HEIGHT}vh`,
       }}
     ></style>
     <!-- defines global css variables. This will be applied to <html> <body> and some other elements idk why -->
@@ -497,92 +530,1064 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
       href={`${Astro.site}rss.xml`}
     />
 
-    <link
-      rel="alternate"
-      type="application/atom+xml"
-      title={profileConfig.name}
-      href={`${Astro.site}atom.xml`}
-    />
-
-    <!-- Font Setup (Astro Font API) -->
-    <FontSetup />
+    <!-- Font Manager -->
+    {siteConfig.font.enable && siteConfig.font.selected?.includes("aazongyiyuan") && (
+      <link rel="preload" href="/fonts/AaZongYiYuan/AaZongYiYuan-2.woff2" as="font" type="font/woff2" crossorigin />
+    )}
+    <FontManager />
   </head>
   <body
     class="min-h-screen"
     class:list={[
       {
-        "is-home": isHomePageCheck,
-        "sticky-navbar": navbarMode === "fixed",
-        "dynamic-navbar": navbarMode === "dynamic",
+        "lg:is-home": isHomePageCheck,
+        "enable-banner": enableBanner,
+        "enable-card-border": siteConfig.card?.border,
       },
+      ...(siteConfig.font.enable && siteConfig.font.selected
+        ? (Array.isArray(siteConfig.font.selected)
+            ? siteConfig.font.selected
+            : [siteConfig.font.selected]
+          ).map((fontId) => `font-${fontId}-enabled`)
+        : []),
     ]}
   >
-    <!-- 首帧前按运行时壁纸模式翻转卡片透明类（布局已由 data-wallpaper-mode 属性规则接管） -->
-    <script is:inline>
-      (function () {
-        const wm = document.documentElement.getAttribute("data-wallpaper-mode");
-        if (!wm) return;
-        document.body.classList.toggle(
-          "wallpaper-transparent",
-          wm === "overlay" ||
-            (wm === "fullscreen" &&
-              document.documentElement.getAttribute("data-fullscreen-layout") === "hero"),
-        );
-      })();
-    </script>
 
+    <PageLoader />
     <div id="progress-bar"></div>
-
-    {/* 卡片样式：根据 localStorage 覆盖默认配置 */}
-    <script is:inline define:vars={{
-      defaultBorder: siteConfig.card?.border ?? false,
-      defaultFollowTheme: siteConfig.card?.followTheme ?? false,
-    }}>
-      (function() {
-        var stored = localStorage.getItem("cardBorderEnabled");
-        var border = stored !== null ? stored === "true" : defaultBorder;
-        if (border) document.documentElement.classList.add("enable-card-border");
-        else document.documentElement.classList.remove("enable-card-border");
-
-        stored = localStorage.getItem("cardFollowThemeEnabled");
-        var follow = stored !== null ? stored === "true" : defaultFollowTheme;
-        if (follow) document.body.classList.add("card-follow-theme-hue");
-        else document.body.classList.remove("card-follow-theme-hue");
-      })();
-    </script>
 
     <!-- 页面顶部渐变高光效果 - 只在full和semifull模式下显示 -->
     {shouldShowTopHighlight && <div class="top-gradient-highlight" />}
     <ConfigCarrier />
     <MusicManager />
+    <FloatingLyrics />
+    <MobileDock />
     <slot />
 
-    <!-- 播放器视图脚本：必须在 <slot /> 之后（解析到它时所有 widget 的 DOM 要已存在），
-         且在 MusicManager 之后（swup 重跑按文档顺序，window.__fireflyMusic 得先就位） -->
-    {(musicPlayerConfig.showInNavbar || musicPlayerConfig.showInSidebar !== false) && (
-      <MusicPlayerView />
-    )}
 
 
     <!-- Sakura Effect -->
     <SakuraEffect />
 
-    <!-- Water Waves Effect -->
-    <WavesEffect />
-
     <!-- Fancybox Manager -->
     <FancyboxManager />
 
-    <!-- Tab 代码块交互 -->
-    <CodeGroupManager />
-
-    <!-- GitHub 卡片客户端实时补全（forks/stars） -->
-    <GithubCardManager />
+    <!-- 全屏搜索弹窗 (Ctrl+K / Cmd+K 触发) -->
+    <SearchModal client:idle placeholders={["搜索文章、标签、分类...", "输入关键词开始搜索", "试试搜索「Astro」或「Svelte」", "按 ESC 关闭搜索面板", "Ctrl+K 快速切换AI搜索/普通搜索"]} />
   </body>
 </html>
 
+<style
+  is:global
+  define:vars={{
+    "banner-height-home": `${BANNER_HEIGHT_HOME}vh`,
+    "banner-height": `${BANNER_HEIGHT}vh`,
+  }}
+>
+  @reference "../styles/main.css";
+
+  @layer components {
+    .enable-banner #wallpaper-wrapper {
+      height: var(--banner-height-home);
+      transform: translateY(var(--banner-height-extend));
+    }
+
+    .enable-banner #banner {
+      height: var(--banner-height-home);
+      transform: translateY(0);
+    }
+
+    .enable-banner #main-grid {
+      transform: translateY(var(--banner-height-extend));
+    }
+  }
+
+  @layer utilities {
+    .enable-banner #sidebar-sticky {
+      top: calc(1rem - var(--banner-height-extend)) !important;
+    }
+    .enable-banner #left-sidebar-sticky {
+      top: calc(1rem - var(--banner-height-extend)) !important;
+    }
+    .enable-banner #right-sidebar-sticky {
+      top: calc(1rem - var(--banner-height-extend)) !important;
+    }
+  }
+
+  @media (max-width: 1023px) {
+    body.enable-banner:not(.lg\:is-home) #main-grid {
+      transform: none !important;
+    }
+
+    body.enable-banner:not(.lg\:is-home) #top-row {
+      height: auto !important;
+    }
+
+    body.enable-banner:not(.lg\:is-home) #sidebar-sticky,
+    body.enable-banner:not(.lg\:is-home) #left-sidebar-sticky,
+    body.enable-banner:not(.lg\:is-home) #right-sidebar-sticky {
+      top: 1rem !important;
+    }
+  }
+</style>
 
 <script>
-  import { initLayout } from "@/utils/layout-init";
-  initLayout();
+  import { pathsEqual, url } from "@/utils/url-utils";
+  import {
+    BANNER_HEIGHT,
+    BANNER_HEIGHT_HOME,
+    BANNER_HEIGHT_EXTEND,
+    // MAIN_PANEL_OVERLAPS_BANNER_HEIGHT,
+  } from "@/constants/constants";
+  import { backgroundWallpaper, expressiveCodeConfig, siteConfig } from "@/config";
+
+  // ===== check-flink 友链状态渲染 =====
+  // 部署到 Vercel/Zeabur 后，把下方 URL 替换为 https://.../result.json
+  const CHECK_FLINK_RESULT_URL = "https://check.fqzlr.com/result.json";
+  const CHECK_FLINK_CACHE_KEY = "checkFlinkResultCache";
+  const CHECK_FLINK_CACHE_TTL = 30 * 60 * 1000; // 30 分钟
+
+  function normalizeUrl(u) {
+    return (u || "").replace(/\/$/, "").trim();
+  }
+
+  function pickFriendStatus(href, data) {
+    if (!data || !Array.isArray(data.link_status)) return null;
+    const target = normalizeUrl(href);
+    for (let i = 0; i < data.link_status.length; i++) {
+      if (normalizeUrl(data.link_status[i].link) === target) {
+        return data.link_status[i];
+      }
+    }
+    return null;
+  }
+
+  function applyFriendStatus(statusEl, info) {
+    statusEl.style.display = "inline-flex";
+    const lat = info.latency;
+    let status = "success";
+    let label = "";
+    if (lat === -1) {
+      status = "timeout";
+      label = "超时";
+    } else if (lat < 1) {
+      status = "success";
+      label = (Math.round(lat * 1000)) + " MS";
+    } else if (lat < 2) {
+      status = "slow";
+      label = (Math.round(lat * 1000)) + " MS";
+    } else {
+      status = "warn";
+      label = (Math.round(lat * 1000)) + " MS";
+    }
+    statusEl.setAttribute("data-status", status);
+    statusEl.textContent = label;
+  }
+
+  // 友链截图背景图：注入 --siteshot-url CSS 变量，由 FriendCard.astro 渲染
+  function applyFriendScreenshot(card, info) {
+    if (!info || !info.siteshot) return;
+    const url = String(info.siteshot).trim();
+    if (!url) return;
+    card.setAttribute("data-siteshot", url);
+    card.style.setProperty("--siteshot-url", `url("${url}")`);
+
+    // 监听截图加载失败：失败时清空属性让 FriendCard 降级到纯色背景
+    const probe = new Image();
+    probe.onerror = () => {
+      card.removeAttribute("data-siteshot");
+      card.style.removeProperty("--siteshot-url");
+    };
+    probe.src = url;
+  }
+
+  function readCheckFlinkCache() {
+    try {
+      const raw = localStorage.getItem(CHECK_FLINK_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.data || !parsed.ts) return null;
+      if (Date.now() - parsed.ts > CHECK_FLINK_CACHE_TTL) return null;
+      return parsed.data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeCheckFlinkCache(data) {
+    try {
+      localStorage.setItem(
+        CHECK_FLINK_CACHE_KEY,
+        JSON.stringify({ data: data, ts: Date.now() }),
+      );
+    } catch (e) {
+      /* localStorage 满，忽略 */
+    }
+  }
+
+  async function renderLinkStatus() {
+    const cards = document.querySelectorAll(".friend-card-link");
+    if (cards.length === 0) return;
+
+    // 1. 先用缓存快速渲染
+    const cached = readCheckFlinkCache();
+    if (cached) {
+      cards.forEach((card) => {
+        const href = card.getAttribute("href") || "";
+        const statusEl = card.querySelector<HTMLElement>(".friend-status");
+        if (!statusEl) return;
+        const info = pickFriendStatus(href, cached);
+        if (info) {
+          applyFriendStatus(statusEl, info);
+          applyFriendScreenshot(card, info);
+        }
+      });
+    }
+
+    // 2. 后台拉取最新数据
+    try {
+      const res = await fetch(CHECK_FLINK_RESULT_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      writeCheckFlinkCache(data);
+      cards.forEach((card) => {
+        const href = card.getAttribute("href") || "";
+        const statusEl = card.querySelector<HTMLElement>(".friend-status");
+        if (!statusEl) return;
+        const info = pickFriendStatus(href, data);
+        if (info) {
+          applyFriendStatus(statusEl, info);
+          applyFriendScreenshot(card, info);
+        } else {
+          statusEl.style.display = "none";
+          statusEl.textContent = "";
+        }
+      });
+    } catch (err) {
+      console.warn("[check-flink] 状态拉取失败，使用缓存：", err);
+    }
+  }
+  // ===== check-flink end =====
+
+  /* Preload fonts */
+  // (async function() {
+  // 	try {
+  // 		await Promise.all([
+  // 			document.fonts.load("400 1em Roboto"),
+  // 			document.fonts.load("700 1em Roboto"),
+  // 		]);
+  // 		document.body.classList.remove("hidden");
+  // 	} catch (error) {
+  // 		console.log("Failed to load fonts:", error);
+  // 	}
+  // })();
+
+  /* TODO This is a temporary solution for style flicker issue when the transition is activated */
+  /* issue link: https://github.com/withastro/astro/issues/8711, the solution get from here too */
+  /* update: fixed in Astro 3.2.4 */
+  /*
+function disableAnimation() {
+	const css = document.createElement('style')
+	css.appendChild(
+		document.createTextNode(
+			`*{
+              -webkit-transition:none!important;
+              -moz-transition:none!important;
+              -o-transition:none!important;
+              -ms-transition:none!important;
+              transition:none!important
+              }`
+		)
+	)
+	document.head.appendChild(css)
+
+	return () => {
+		// Force restyle
+		;(() => window.getComputedStyle(document.body))()
+
+		// Wait for next tick before removing
+		setTimeout(() => {
+			document.head.removeChild(css)
+		}, 1)
+	}
+}
+*/
+
+  const bannerEnabled = !!document.getElementById("wallpaper-wrapper");
+
+  function setClickOutsideToClose(panel: string, ignores: string[]) {
+      // 跳过全屏导航菜单，它有自己的处理逻辑
+      if (panel === "nav-menu-panel") return;
+
+      document.addEventListener("click", (event) => {
+          let panelDom = document.getElementById(panel);
+          if (!panelDom) return;
+          let tDom = event.target;
+          if (!(tDom instanceof Node)) return; // Ensure the event target is an HTML Node
+          for (let ig of ignores) {
+              let ie = document.getElementById(ig);
+              if (ie == tDom || ie?.contains(tDom)) {
+                  return;
+              }
+          }
+          panelDom.classList.add("float-panel-closed");
+      });
+  }
+  setClickOutsideToClose("display-setting", [
+    "display-setting",
+    "dock-hue-btn",
+  ]);
+  // 导航菜单由 NavMenuPanel.astro 自己处理点击外部关闭
+  setClickOutsideToClose("search-panel", [
+    "search-panel",
+    "search-bar",
+    "search-switch",
+  ]);
+  setClickOutsideToClose("wallpaper-mode-panel", [
+    "wallpaper-mode-panel",
+    "wallpaper-mode-switch",
+  ]);
+  setClickOutsideToClose("theme-mode-panel", [
+    "theme-mode-panel",
+    "scheme-switch",
+  ]);
+
+  function initCustomScrollbar() {
+    // 只处理katex元素的滚动条，使用浏览器原生滚动条
+    const katexElements = document.querySelectorAll(
+      ".katex-display:not([data-scrollbar-initialized])"
+    ) as NodeListOf<HTMLElement>;
+    katexElements.forEach((element) => {
+      if (!element.parentNode) return;
+
+      const container = document.createElement("div");
+      container.className = "katex-display-container";
+      element.parentNode.insertBefore(container, element);
+      container.appendChild(element);
+
+      // 使用浏览器原生滚动条，无自定义样式
+      container.style.cssText = `
+			overflow-x: auto;
+		`;
+
+      element.setAttribute("data-scrollbar-initialized", "true");
+    });
+  }
+
+  function showBanner() {
+    const isBannerMode = backgroundWallpaper.mode === "banner";
+    if (!isBannerMode) return;
+
+    // 使用requestAnimationFrame优化DOM操作
+    requestAnimationFrame(() => {
+      // Handle single image banner (desktop)
+      const banner = document.getElementById("banner");
+      if (banner) {
+        banner.classList.remove("opacity-0", "scale-105");
+      }
+
+      // Handle mobile single image banner - 使用与电脑端相同的逻辑
+      const mobileBanner = document.querySelector(
+        '.block.lg\\:hidden[alt="Mobile banner image of the blog"]'
+      );
+      if (mobileBanner) {
+        // 移动端使用与电脑端相同的初始化逻辑
+        mobileBanner.classList.remove("opacity-0", "scale-105");
+        mobileBanner.classList.add("opacity-100");
+      }
+    });
+  }
+
+  // Capture 阶段全局 click 监听：点击音乐链接时立即隐藏侧边栏并切换暗色主题（比 Swup link:click 更早）
+  document.addEventListener("click", function(e) {
+    var link = e.target instanceof Element ? e.target.closest('a[href]') : null;
+    if (!link) return;
+    var href = link.getAttribute("href") || "";
+    if (href === "/music/" || href === "/music") {
+      document.documentElement.classList.add("is-navigating-to-music");
+      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-theme", "one-dark-pro");
+    }
+  }, true);
+
+  const setup = () => {
+    // TODO: temp solution to change the height of the banner
+    /*
+	window.swup.hooks.on('animation:out:start', () => {
+		const path = window.location.pathname
+		const body = document.querySelector('body')
+		if (path[path.length - 1] === '/' && !body.classList.contains('is-home')) {
+			body.classList.add('is-home')
+		} else if (path[path.length - 1] !== '/' && body.classList.contains('is-home')) {
+			body.classList.remove('is-home')
+		}
+	})
+*/
+    window.swup.hooks.on("link:click", (visit: any, { el }: { el: HTMLAnchorElement }) => {
+      // Remove the delay for the first time page load
+      document.documentElement.style.setProperty("--content-delay", "0ms");
+
+      // 同页链接点击不需要过渡保护
+      const targetHref = el.getAttribute("href") || "";
+      const targetPathname = (() => {
+        try {
+          return new URL(targetHref, window.location.origin).pathname;
+        } catch {
+          return targetHref;
+        }
+      })();
+      const isSamePage = pathsEqual(targetPathname, window.location.pathname);
+      if (!isSamePage) {
+        // 添加页面切换保护，防止导航栏闪烁
+        document.documentElement.classList.add("is-page-transitioning");
+      }
+
+      // 导航到音乐页面时，立即隐藏侧边栏等组件，防止闪烁
+      const toPath = visit?.to?.url || targetPathname;
+      if (toPath === "/music/" || toPath === "/music") {
+        document.documentElement.classList.add("is-navigating-to-music");
+      }
+
+    });
+
+    // Swup 内容替换后移除音乐页面过渡类
+    window.swup.hooks.on("content:replace", () => {
+      document.documentElement.classList.remove("is-navigating-to-music");
+
+      // 移除新内容中的 onload-animation 类，防止 is-animating 移除后 opacity 1→0 跳变闪烁
+      // onload-animation 默认 opacity:0，swup.css 修复A 在 is-animating 期间强制 opacity:1，
+      // 当 is-animating 移除时会有 1→0 的瞬间跳变，然后才动画淡入——这个跳变就是"闪一下"
+      document.querySelectorAll("#swup-container .onload-animation, #left-sidebar-dynamic .onload-animation, #right-sidebar-dynamic .onload-animation").forEach((el) => {
+        (el as HTMLElement).classList.remove("onload-animation");
+        (el as HTMLElement).style.opacity = "1";
+        (el as HTMLElement).style.transform = "none";
+      });
+
+      // 如果离开音乐页面，恢复用户原始主题
+      const isMusicPage = window.location.pathname === "/music/" || window.location.pathname === "/music";
+      if (!isMusicPage) {
+        const storedTheme = localStorage.getItem("theme") || "system";
+        let isDark = storedTheme === "dark" || (storedTheme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (isDark) {
+          document.documentElement.classList.add("dark");
+          document.documentElement.setAttribute("data-theme", "one-dark-pro");
+        } else {
+          document.documentElement.classList.remove("dark");
+          document.documentElement.setAttribute("data-theme", "one-light");
+        }
+      }
+    });
+    window.swup.hooks.on("content:replace", (visit: any) => {
+      // 修复 Swup 过渡：在此处切换布局类，避免 visit:start 时切换导致 Banner 高度跳动
+      const bodyElement = document.querySelector("body");
+      const isHome = pathsEqual(window.location.pathname, url("/"));
+
+      if (isHome) {
+        bodyElement!.classList.add("lg:is-home");
+        document.documentElement.classList.add("lg:is-home");
+      } else {
+        bodyElement!.classList.remove("lg:is-home");
+        document.documentElement.classList.remove("lg:is-home");
+      }
+
+      // ===== 首页布局动态切换 =====
+      const mainGrid = document.getElementById("main-grid");
+      if (mainGrid) {
+        const gridCarrier = document.getElementById("grid-class-carrier");
+        const defaultGridClass = gridCarrier?.getAttribute("data-grid-class") || "grid-cols-1 md:grid-cols-[17.5rem_1fr]";
+
+        // 1. 更新网格列（侧边栏显隐由 CSS .lg\:is-home 控制）
+        ["grid-cols-1", "md:grid-cols-[17.5rem_1fr]", "md:grid-cols-[1fr_17.5rem]", "xl:grid-cols-[17.5rem_1fr_17.5rem]"].forEach(cls => mainGrid.classList.remove(cls));
+        if (isHome) {
+          mainGrid.classList.add("grid-cols-1");
+        } else {
+          defaultGridClass.split(" ").forEach(cls => cls && mainGrid.classList.add(cls));
+        }
+
+        // 2. 首页去除 max-width 和 padding 限制
+        const parentWrapper = mainGrid.parentElement;
+        if (parentWrapper) {
+          if (isHome) {
+            parentWrapper.style.maxWidth = "none";
+            mainGrid.style.paddingLeft = "0";
+            mainGrid.style.paddingRight = "0";
+          } else {
+            parentWrapper.style.maxWidth = "";
+            mainGrid.style.paddingLeft = "";
+            mainGrid.style.paddingRight = "";
+          }
+        }
+
+        // 3. 更新主内容区定位
+        const mainContentWrapper = document.getElementById("main-content-wrapper");
+        if (mainContentWrapper) {
+          mainContentWrapper.classList.remove("col-span-1", "xl:col-start-2", "xl:col-end-3", "md:col-span-2");
+          if (isHome) {
+            mainContentWrapper.classList.add("col-span-1");
+          } else {
+            mainContentWrapper.classList.add("xl:col-start-2", "xl:col-end-3");
+          }
+        }
+
+        // 4. 更新页脚
+        const footer = mainGrid.querySelector('.footer');
+        if (footer) {
+          footer.classList.remove("col-span-1", "md:col-span-2", "xl:col-start-2", "xl:col-span-1");
+          if (isHome) {
+            footer.classList.add("col-span-1");
+          } else {
+            footer.classList.add("md:col-span-2", "xl:col-start-2", "xl:col-span-1");
+          }
+        }
+      }
+      // ===== 首页布局切换结束 =====
+
+      // 同步 banner 文字覆盖层可见性
+      const bannerTextOverlay = document.querySelector(".banner-home-text-overlay");
+      if (bannerTextOverlay) {
+        if (isHome) {
+          bannerTextOverlay.classList.remove("hidden");
+        } else {
+          bannerTextOverlay.classList.add("hidden");
+        }
+      }
+
+      // 同步导航栏透明模式
+      const navEl = document.getElementById("navbar");
+      if (navEl) {
+        navEl.setAttribute("data-is-home", isHome.toString());
+      }
+
+      // Swup 转换后重新同步壁纸模式状态
+      // 无论是否首页，都需要重新应用壁纸模式，因为 wallpaper-wrapper 等 DOM 元素被替换了
+      import("@/utils/setting-utils").then(({ applyWallpaperModeToDocument }) => {
+        const currentMode = (document.documentElement.getAttribute("data-wallpaper-mode") || "banner") as any;
+        try { applyWallpaperModeToDocument(currentMode); } catch (e) { /* ignore */ }
+      });
+
+      // ===== 主内容包裹层定位与壁纸区显隐的双向同步 =====
+      // .w-full.z-30 主内容包裹层与 #wallpaper-wrapper 都不在任何 Swup 容器内
+      // （跨页面持久存在），其 top 定位/显隐由各页 SSR 按页面类型计算，
+      // Swup 换内容后必须手动双向同步，否则首页⇄其他页切换时内容区会停在错误的 top 上，
+      // 壁纸区也会在离开首页后保持隐藏（或进入首页后仍显示），表现为"首次切换页面背景错乱"。
+      // 新页面的 SSR 定位值直接从 Swup 解析好的目标文档读取，避免手写布局常量。
+      const newDoc = visit?.to?.document as Document | undefined;
+      const mainShell = document.querySelector(
+        ".w-full.z-30.pointer-events-none",
+      ) as HTMLElement | null;
+      const wallpaperWrapper = document.getElementById("wallpaper-wrapper");
+      const wallpaperMode = document.documentElement.getAttribute("data-wallpaper-mode");
+      if (isHome) {
+        // 进入首页：首屏由影像揭示层承接，主内容区从视口顶部开始，壁纸区隐藏
+        if (mainShell) {
+          mainShell.style.top = "0";
+          mainShell.style.marginTop = "";
+          mainShell.style.zIndex = "";
+        }
+        wallpaperWrapper?.classList.add("hidden");
+      } else {
+        // 离开首页：恢复非首页的 SSR top 定位，并显示壁纸区（none 模式除外，由 hideAllWallpapers 管控）
+        const newShell = newDoc?.querySelector(
+          ".w-full.z-30.pointer-events-none",
+        ) as HTMLElement | null;
+        if (mainShell && newShell?.style.top) {
+          mainShell.style.top = newShell.style.top;
+        }
+        if (wallpaperWrapper && wallpaperMode !== "none") {
+          wallpaperWrapper.classList.remove("hidden");
+        }
+      }
+
+      // 更新侧边栏组件的可见性（根据新页面的 URL）
+      updateSidebarComponentsVisibility();
+
+      // 只处理katex元素的容器，使用浏览器原生滚动条
+      initCustomScrollbar();
+
+      // 重新初始化图标加载器
+      import("@/utils/icon-loader").then(({ initIconLoader }) => {
+        initIconLoader();
+      });
+
+      // 检查当前页面是否为文章页面（有TOC元素）
+      const tocWrapper = document.getElementById("toc-wrapper");
+      const isArticlePage = tocWrapper !== null;
+
+      // 只在文章页面重新初始化桌面端 TOC 组件
+      if (isArticlePage) {
+        const tocElement = document.querySelector("table-of-contents");
+        if (tocElement && typeof (tocElement as any).init === "function") {
+          setTimeout(() => {
+            (tocElement as any).init();
+          }, 100);
+        }
+      }
+
+      // 重新初始化semifull模式的滚动检测
+      const navElForSemifull = document.getElementById("navbar");
+      if (navElForSemifull) {
+        const transparentMode = navElForSemifull.getAttribute("data-transparent-mode");
+
+        if (transparentMode === "semifull") {
+          // 重新调用初始化函数来重新绑定滚动事件
+          if (
+            typeof (window as any).initSemifullScrollDetection === "function"
+          ) {
+            (window as any).initSemifullScrollDetection();
+          }
+        }
+      }
+
+    });
+    window.swup.hooks.on("visit:start", (visit: { to: { url: string } }) => {
+      // 音乐页面使用不同的布局结构（Layout vs MainGridLayout），Swup 容器替换无法正确处理
+      // 进出音乐页面时强制整页加载，避免侧边栏残留/消失和音乐资源不加载的问题
+      const fromPath = window.location.pathname;
+      const toPath = new URL(visit.to.url, window.location.origin).pathname;
+      const isMusicPage = (p: string) => p === "/music/" || p === "/music";
+      if (isMusicPage(fromPath) || isMusicPage(toPath)) {
+        window.location.href = visit.to.url;
+        return;
+      }
+
+      // Destroy any leftover lightbox DOM to prevent cross-page image bleed
+      var allLbs = document.querySelectorAll('#photo-lightbox');
+      allLbs.forEach(function(lb) {
+        var img = lb.querySelector<HTMLImageElement>('#lightbox-image, .lightbox-img');
+        if (img) { img.removeAttribute('src'); img.src = ''; }
+        if (lb.parentNode) lb.parentNode.removeChild(lb);
+      });
+      document.body.style.overflow = '';
+      // Start progress bar
+      const progressBar = document.getElementById("progress-bar");
+      if (progressBar) {
+        progressBar.classList.remove("finishing", "done");
+        // Force reflow so the animation restarts cleanly
+        void progressBar.offsetWidth;
+        progressBar.classList.add("loading");
+      }
+
+      // Control mobile banner visibility based on page with improved staging animation
+      // 只在移动端（1024px以下）处理banner隐藏
+      const isMobile = window.innerWidth < 1024;
+      const isHomePage = pathsEqual(visit.to.url, url("/"));
+
+      // 在移动端禁用文章列表容器的过渡动画，防止与主内容区位置变化冲突
+      if (isMobile) {
+        const postListContainer = document.getElementById("post-list-container");
+        if (postListContainer) {
+          postListContainer.style.transition = "none";
+        }
+      }
+
+      const wallpaperWrapper = document.getElementById("wallpaper-wrapper");
+      const mainContentWrapper = document.querySelector(
+        ".absolute.w-full.z-30"
+      ) as HTMLElement | null;
+
+      if (isMobile && wallpaperWrapper && mainContentWrapper) {
+        if (isHomePage) {
+          // 首页：禁用主内容区域的过渡动画，防止文章列表下移
+          mainContentWrapper.style.transition = "none";
+
+          // 先显示banner，然后移除隐藏类让其优雅出现
+          wallpaperWrapper.style.display = "";
+          setTimeout(() => {
+            wallpaperWrapper.classList.remove("mobile-hide-banner");
+          }, 100);
+          setTimeout(() => {
+            mainContentWrapper.classList.remove("mobile-main-no-banner");
+            // 在移除类之后立即恢复过渡动画（下次导航时使用）
+            setTimeout(() => {
+              mainContentWrapper.style.transition = "";
+            }, 50);
+          }, 150);
+        } else {
+          // 非首页：分阶段隐藏，先隐藏banner，再移动内容
+          wallpaperWrapper.classList.add("mobile-hide-banner");
+          // 延迟移动内容，让banner先完全消失
+          setTimeout(() => {
+            mainContentWrapper.classList.add("mobile-main-no-banner");
+          }, 100);
+        }
+      } else if (!isMobile && wallpaperWrapper) {
+        // 桌面端：确保banner正常显示
+        wallpaperWrapper.style.display = "";
+        wallpaperWrapper.classList.remove("mobile-hide-banner");
+        if (mainContentWrapper) {
+          mainContentWrapper.classList.remove("mobile-main-no-banner");
+        }
+      }
+
+      // increase the page height during page transition to prevent the scrolling animation from jumping
+      const heightExtend = document.getElementById("page-height-extend");
+      if (heightExtend) {
+        heightExtend.classList.remove("hidden");
+      }
+
+      // Hide the TOC while scrolling back to top
+      let toc = document.getElementById("toc-wrapper");
+      if (toc) {
+        toc.classList.add("toc-not-ready");
+      }
+    });
+    window.swup.hooks.on("page:view", () => {
+      // 标记已完成至少一次 Swup 导航，后续 onload-animation 直接显示不再播放淡入动画
+      // 避免 is-animating 移除时 opacity 1→0→1 的跳变闪烁
+      document.documentElement.classList.add("swup-navigated");
+
+      // 更新网格列数和侧边栏组件可见性
+      updateMainGridCols();
+      updateSidebarComponentsVisibility();
+
+      // 渲染友链状态（check-flink）
+      renderLinkStatus();
+
+      // hide the temp high element when the transition is done
+      const heightExtend = document.getElementById("page-height-extend");
+      if (heightExtend) {
+        heightExtend.classList.remove("hidden");
+      }
+
+      // 确保页面滚动到顶部，使用平滑滚动避免侧边栏闪烁
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+
+      // 在移动端恢复文章列表容器的过渡动画（在主内容区位置动画完成后）
+      const isMobile = window.innerWidth < 1024;
+      if (isMobile) {
+        setTimeout(() => {
+          const postListContainer = document.getElementById("post-list-container");
+          if (postListContainer) {
+            postListContainer.style.transition = "";
+          }
+        }, 600); // 等待主内容区动画完成（0.4s + 0.1s delay + 100ms buffer）
+      }
+
+      // 同步主题状态 - 解决从首页进入文章页面时代码块渲染问题
+      const storedTheme = localStorage.getItem("theme") || siteConfig.themeColor.defaultMode || "light";
+      let isDark = false;
+      
+      // 处理 system 模式
+      if (storedTheme === "system") {
+        isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      } else {
+        isDark = storedTheme === "dark";
+      }
+      
+      const expectedTheme = isDark
+        ? expressiveCodeConfig.darkTheme
+        : expressiveCodeConfig.lightTheme;
+      const currentTheme = document.documentElement.getAttribute("data-theme");
+
+      // 如果主题不匹配，静默更新（不触发事件，避免重新加载效果）
+      if (currentTheme !== expectedTheme) {
+        document.documentElement.setAttribute("data-theme", expectedTheme);
+      }
+
+      // 检查当前页面是否为文章页面，如果是则触发自定义事件用于初始化评论系统
+      setTimeout(() => {
+        if (document.getElementById("tcomment")) {
+          // 触发自定义事件，通知评论系统页面已完全加载
+          const pageLoadedEvent = new CustomEvent("firefly:page:loaded", {
+            detail: {
+              path: window.location.pathname,
+              timestamp: Date.now(),
+            },
+          });
+          document.dispatchEvent(pageLoadedEvent);
+          console.log(
+            "Layout: 触发 firefly:page:loaded 事件，路径:",
+            window.location.pathname
+          );
+        }
+      }, 300);
+    });
+    window.swup.hooks.on("visit:end", (_visit: { to: { url: string } }) => {
+      // Finish progress bar
+      const progressBar = document.getElementById("progress-bar");
+      if (progressBar) {
+        progressBar.classList.remove("loading");
+        progressBar.classList.add("finishing");
+        setTimeout(() => {
+          progressBar.classList.remove("finishing");
+          progressBar.classList.add("done");
+          setTimeout(() => {
+            progressBar.classList.remove("done");
+          }, 300);
+        }, 200);
+      }
+
+      setTimeout(() => {
+        const heightExtend = document.getElementById("page-height-extend");
+        if (heightExtend) {
+          heightExtend.classList.add("hidden");
+        }
+
+        // Just make the transition looks better
+        const toc = document.getElementById("toc-wrapper");
+        if (toc) {
+          toc.classList.remove("toc-not-ready");
+        }
+
+        // 移除页面切换保护，恢复过渡动画
+        document.documentElement.classList.remove("is-page-transitioning");
+      }, 200);
+    });
+
+
+  };
+  if (window?.swup?.hooks) {
+    setup();
+  } else {
+    document.addEventListener("swup:enable", setup);
+  }
+
+  let backToTopBtn = document.getElementById("back-to-top-btn");
+  let toc = document.getElementById("toc-wrapper");
+
+  // 优化的滚动处理函数
+  function scrollFunction() {
+    const scrollTop = document.documentElement.scrollTop;
+    const bannerHeight = window.innerHeight * (BANNER_HEIGHT / 100);
+
+    // 使用批量DOM操作优化性能
+    const operations: (() => void)[] = [];
+
+    if (backToTopBtn) {
+      operations.push(() => {
+        if (scrollTop > bannerHeight) {
+          backToTopBtn.classList.remove("hide");
+        } else {
+          backToTopBtn.classList.add("hide");
+        }
+      });
+    }
+
+    if (bannerEnabled && toc) {
+      operations.push(() => {
+        if (scrollTop > bannerHeight) {
+          toc.classList.remove("toc-hide");
+        } else {
+          toc.classList.add("toc-hide");
+        }
+      });
+    }
+
+    // 滚动超过 20px 启用导航栏药丸形收缩
+    const currentScrollY = window.pageYOffset || document.documentElement.scrollTop;
+    const _navEl = document.getElementById("navbar");
+    if (_navEl) {
+      if (currentScrollY > 20) {
+        _navEl.classList.add("scrolled");
+      } else {
+        _navEl.classList.remove("scrolled");
+      }
+    }
+
+    // 批量执行DOM操作
+    if (operations.length > 0) {
+      requestAnimationFrame(() => {
+        operations.forEach((op) => op());
+      });
+    }
+  }
+
+  // 使用优化的滚动性能处理
+  let scrollTimeout: number;
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (scrollTimeout) {
+        cancelAnimationFrame(scrollTimeout);
+      }
+      scrollTimeout = requestAnimationFrame(scrollFunction);
+    },
+    { passive: true }
+  );
+
+  window.onresize = () => {
+    // calculate the --banner-height-extend, which needs to be a multiple of 4 to avoid blurry text
+    let offset = Math.floor(window.innerHeight * (BANNER_HEIGHT_EXTEND / 100));
+    offset = offset - (offset % 4);
+    document.documentElement.style.setProperty(
+      "--banner-height-extend",
+      `${offset}px`
+    );
+  };
+
+  // 页面加载完成后初始化banner和katex容器
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      showBanner();
+      initCustomScrollbar();
+    });
+  } else {
+    showBanner();
+    initCustomScrollbar();
+  }
+
+  // 检查当前页面是否为文章详情页
+  const isCurrentPagePost = () =>
+    window.location.pathname.includes("/posts/") || window.location.pathname.includes("/post/");
+
+  // 更新主网格的网格列数
+  function updateMainGridCols() {
+    const mainGrid = document.getElementById("main-grid");
+    if (!mainGrid) return;
+
+    const isPostPage = isCurrentPagePost();
+    const sidebarPosition = mainGrid.getAttribute("data-sidebar-position") || "left";
+    const tabletSidebar = mainGrid.getAttribute("data-tablet-sidebar") || "left";
+    const showBothSidebarsOnPostPage = mainGrid.getAttribute("data-show-both-sidebars-on-post") === "true";
+
+    const shouldBothSidebars = isPostPage && sidebarPosition !== "both" && showBothSidebarsOnPostPage;
+
+    let newGridClasses: string;
+
+    if (sidebarPosition === "both" || shouldBothSidebars) {
+      // 双侧栏（含文章页临时双侧栏）
+      // 从right临时扩展为both时，平板端保持显示右侧栏
+      const effectiveTabletSidebar = (shouldBothSidebars && sidebarPosition === "right") ? "right" : tabletSidebar;
+      if (effectiveTabletSidebar === "right") {
+        newGridClasses = "grid-cols-1 md:grid-cols-[1fr_17.5rem] xl:grid-cols-[17.5rem_1fr_17.5rem]";
+      } else {
+        newGridClasses = "grid-cols-1 md:grid-cols-[17.5rem_1fr] xl:grid-cols-[17.5rem_1fr_17.5rem]";
+      }
+    } else if (sidebarPosition === "right") {
+      // 仅右侧栏
+      newGridClasses = "grid-cols-1 md:grid-cols-[1fr_17.5rem]";
+    } else {
+      // 仅左侧栏
+      newGridClasses = "grid-cols-1 md:grid-cols-[17.5rem_1fr]";
+    }
+
+    // 移除旧类并添加新类
+    ["grid-cols-1", "md:grid-cols-[17.5rem_1fr]", "md:grid-cols-[1fr_17.5rem]", "xl:grid-cols-[17.5rem_1fr_17.5rem]"].forEach(
+      cls => mainGrid.classList.remove(cls)
+    );
+
+    newGridClasses.split(" ").forEach(cls => cls && mainGrid.classList.add(cls));
+
+    // position为right时，swup导航不会替换静态元素(右侧栏、主内容容器、页脚)的class
+    // 需要在JS中手动更新这些元素的网格定位类，以匹配2列/3列布局的切换
+    if (sidebarPosition === "right") {
+      const rightSidebar = document.getElementById("right-sidebar");
+      const swupContainer = document.getElementById("swup-container");
+      const footer = mainGrid.querySelector('.footer');
+
+      if (shouldBothSidebars) {
+        // 文章页临时双侧栏：右侧栏移到第3列，主内容移到第2列，页脚居中
+        rightSidebar?.classList.add("xl:col-start-3");
+        swupContainer?.classList.add("xl:col-start-2", "xl:col-end-3");
+        if (footer) {
+          footer.classList.remove("md:col-start-1", "xl:col-start-1");
+          footer.classList.add("xl:col-start-2");
+        }
+      } else {
+        // 非文章页：恢复2列布局定位
+        rightSidebar?.classList.remove("xl:col-start-3");
+        swupContainer?.classList.remove("xl:col-start-2", "xl:col-end-3");
+        if (footer) {
+          footer.classList.add("md:col-start-1", "xl:col-start-1");
+          footer.classList.remove("xl:col-start-2");
+        }
+      }
+    }
+  }
+
+  // 更新侧边栏组件的可见性
+  function updateSidebarComponentsVisibility() {
+    const isPostPage = isCurrentPagePost();
+
+    // 处理 showOnPostPage === false 的组件
+    document.querySelectorAll(".widget-hide-on-post").forEach((widget) => {
+      isPostPage ? widget.classList.add("hidden") : widget.classList.remove("hidden");
+    });
+
+    // 处理 showOnNonPostPage === false 的组件
+    document.querySelectorAll(".widget-hide-on-non-post").forEach((widget) => {
+      !isPostPage ? widget.classList.add("hidden") : widget.classList.remove("hidden");
+    });
+  }
+
+  // Initialize wallpaper mode
+  import { initWallpaperMode, initThemeListener } from "@/utils/setting-utils";
+  import { initIconLoader } from "@/utils/icon-loader";
+  import { initPageLoader } from "@/utils/page-loader-controller.js";
+
+  // 首页初始布局约束移除
+  function applyHomeLayoutOnLoad() {
+    const mainGrid = document.getElementById("main-grid");
+    if (!mainGrid) return;
+    const isHome = document.body.classList.contains("lg:is-home");
+    if (!isHome) return;
+    const parentWrapper = mainGrid.parentElement;
+    if (parentWrapper) {
+      parentWrapper.style.maxWidth = "none";
+      mainGrid.style.paddingLeft = "0";
+      mainGrid.style.paddingRight = "0";
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      updateMainGridCols();
+      updateSidebarComponentsVisibility();
+      initWallpaperMode();
+      initThemeListener();
+      initIconLoader();
+      initPageLoader();
+      applyHomeLayoutOnLoad();
+      renderLinkStatus();
+    });
+  } else {
+    updateMainGridCols();
+    updateSidebarComponentsVisibility();
+    initWallpaperMode();
+    initThemeListener();
+    initIconLoader();
+    initPageLoader();
+    applyHomeLayoutOnLoad();
+    renderLinkStatus();
+  }
+
+  // 入场动画结束后摘除 onload-animation 类。
+  // fade-in-up 的 forwards 填充会把 transform 以计算值长期保留在元素上，
+  // 而任何非 none 的 transform 都会成为 position:fixed 后代的包含块——
+  // 首页满屏影像层（home-blinds 的 fixed 舞台与 ScrollTrigger 的 pin）会被
+  // 钉在文档流上随页面滚走，表现为"首图上滑消失 + 大片空白"。
+  // 动画播完后该类已无视觉作用（终态本就是 opacity:1 / transform:none），摘除即恢复。
+  document.addEventListener(
+    "animationend",
+    (event) => {
+      const target = event.target;
+      if (
+        event.animationName === "fade-in-up" &&
+        target instanceof Element &&
+        target.classList.contains("onload-animation")
+      ) {
+        target.classList.remove("onload-animation");
+      }
+    },
+    true,
+  );
+
+  // 动态修改网页标题（标签页标题互动）
+  let originTitle = document.title;
+  let titleTime: ReturnType<typeof setTimeout>;
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      originTitle = document.title;
+      document.title = siteConfig.navbar?.hoverTitle || "w(ﾟДﾟ)w 不要走！再看看嘛！";
+      clearTimeout(titleTime);
+    } else {
+      document.title = "欢迎回来，这里是马俊宇的博客";
+      titleTime = setTimeout(function () {
+        document.title = originTitle;
+      }, 2000);
+    }
+  });
 </script>

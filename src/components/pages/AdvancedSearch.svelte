@@ -92,7 +92,6 @@ onMount(() => {
 		initialize();
 	} else {
 		// 生产环境等待 Pagefind 加载
-		window.__loadPagefind?.();
 		if (window.pagefind) {
 			initialize();
 		} else {
@@ -119,9 +118,9 @@ const handleInput = () => {
             <div class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70">
                 <Icon icon="material-symbols:search" class="text-[1.5rem]"></Icon>
             </div>
-            <div class="text-3xl font-bold text-90">
+            <h1 class="text-3xl font-bold text-90">
                 {title}
-            </div>
+            </h1>
         </div>
         {#if description}
             <p class="text-base text-50 leading-relaxed">

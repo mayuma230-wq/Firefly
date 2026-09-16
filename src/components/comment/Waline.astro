@@ -1,5 +1,12 @@
 ---
-import { commentConfig } from "@/config";
+import "@/styles/vendor/waline.css";
+import WalineRoleBadge from "@/components/features/WalineRoleBadge.astro";
+import {
+	commentConfig,
+	getEnabledFriends,
+	profileConfig,
+	siteConfig,
+} from "@/config";
 
 interface Props {
 	path: string;
@@ -11,42 +18,121 @@ const config = {
 	path: Astro.props.path,
 	dark: "html.dark",
 	wordLimit: ["2", "300"],
+	// 修仙摆烂等级自定义，其余文案默认
+	locale: {
+		level0: "凡尘路人",
+		level1: "摆烂练气",
+		level2: "躺平筑基",
+		level3: "摸鱼金丹",
+		level4: "怠惰元婴",
+		level5: "摆烂仙帝",
+		admin: "主理人",
+	},
 	...(commentConfig.waline?.visitorCount ? { pageview: true } : {}),
 };
+
+// 图床上传配置（传给客户端脚本构造 imageUploader）
+const imageUploadURL = commentConfig.waline?.imageUploadURL || "";
+const imageUploadToken = commentConfig.waline?.imageUploadToken || "";
+
+// 推荐友链 URL 列表（仅取 friendsConfig 中显式标记 recommended:true 的 siteurl）
+const recommendedFriendUrls = getEnabledFriends()
+	.filter((friend) => friend.recommended === true)
+	.map((friend) => friend.siteurl);
+const ownSiteUrl = siteConfig?.site_url || "";
+// 站长识别昵称列表（displayName 兜底，添加截图里出现过的「🍅小马」等）
+const ownerNicknames = Array.from(
+	new Set(
+		[profileConfig?.displayName, profileConfig?.name, "🍅小马"].filter(
+			(v) => typeof v === "string" && v.trim(),
+		),
+	),
+);
 ---
 <!-- Waline -->
 <div class="relative w-full">
-  <div id="waline"></div>
+  <div
+    id="waline"
+    data-waline-root
+    data-waline-path={Astro.props.path}
+    data-waline-site-url={ownSiteUrl}
+    data-waline-recommended-links={JSON.stringify(recommendedFriendUrls)}
+    data-waline-owner-nicknames={JSON.stringify(ownerNicknames)}
+  ></div>
   <link rel="stylesheet" href="https://unpkg.com/@waline/client@v3/dist/waline.css" />
-  <script type="module" is:inline define:vars={{ config }}>
+  <script type="module" is:inline define:vars={{ config, imageUploadURL, imageUploadToken }}>
     import { init } from 'https://unpkg.com/@waline/client@v3/dist/waline.js';
-    const requestedPath = new URLSearchParams(window.location.search).get("path");
-    const effectiveConfig = requestedPath
-      ? { ...config, path: requestedPath }
-      : config;
-    try {
-      init(effectiveConfig);
-    } catch (error) {
-      console.error("[Waline] Failed to initialize:", error);
+
+    // 图床接入：当 imageUploadURL 和 imageUploadToken 都配置时，启用评论图片上传
+    // 教程：https://waline.js.org/cookbook/customize/upload-image.html
+    // 图床 API（cfbed 规范）：POST /upload?uploadFolder=xxx，FormData { file }，Bearer Token 认证
+    if (imageUploadURL && imageUploadToken) {
+
+      /**
+       * 根据当前页面 URL 路径自动生成图床上传文件夹
+       * 规则：
+       *   - 前缀统一为 fqzlrcom/
+       *   - 取路径前 2 段作为子文件夹（最多 3 级：fqzlrcom + 2 段）
+       *   - 超出部分截断，不再往下新建子目录
+       *   - 根路径 / 或无法解析时，回退到 fqzlrcom/comments
+       * 示例：
+       *   /friends/              → fqzlrcom/friends
+       *   /dynamic/              → fqzlrcom/dynamic
+       *   /posts/blog/check-flink/ → fqzlrcom/posts/blog（截断第 3 段）
+       *   /                      → fqzlrcom/comments（回退默认）
+       */
+      function getUploadFolder() {
+        var segments = window.location.pathname
+          .split('/')
+          .filter(function (s) { return s.length > 0; });
+        if (segments.length === 0) return 'fqzlrcom/comments';
+        // 最多取前 2 段，超出截断
+        var parts = segments.slice(0, 2);
+        return 'fqzlrcom/' + parts.join('/');
+      }
+
+      config.imageUploader = (file) => {
+        var folder = getUploadFolder();
+        // cfbed 规范：文件夹通过 query 参数 uploadFolder 传递（相对路径，如 fqzlrcom/friends）
+        var uploadURL = imageUploadURL + '?uploadFolder=' + encodeURIComponent(folder);
+
+        var formData = new FormData();
+        formData.append('file', file);
+        return fetch(uploadURL, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + imageUploadToken,
+            'Accept': 'application/json',
+          },
+          body: formData,
+        })
+          .then((resp) => {
+            if (!resp.ok) throw new Error('图片上传失败: ' + resp.status);
+            return resp.json();
+          })
+          .then((data) => {
+            // cfbed 响应格式: [{ src, publicUrl }] 或 { data: { links: { url } } }
+            var url = '';
+            if (Array.isArray(data) && data[0]) {
+              url = data[0].publicUrl || data[0].src || '';
+            } else if (data?.data?.links?.url) {
+              url = data.data.links.url;
+            } else if (data?.src) {
+              url = data.src;
+            }
+            if (!url) throw new Error('图床响应格式异常');
+            // publicUrl 未配置时 src 是相对路径（如 /file/xxx.jpg），需拼接图床域名
+            if (url.startsWith('/')) {
+              url = new URL(imageUploadURL).origin + url;
+            }
+            return url;
+          });
+      };
     }
+
+    init(config);
   </script>
 </div>
 
-<style is:global>
-  /* 各分类表情数量不同，切换时面板布局会跟着变，下面逐项消除 */
-
-  .wl-tab-wrapper {
-    /* 内容溢出时出现的滚动条会挤掉约 6px 宽度，网格随之重排 */
-    scrollbar-gutter: stable;
-    /* 内容不足时网格区按内容收缩，比顶满时矮 1px；固定高度使其恒定。
-       145px 取自 Waline 自身的 max-height，其大版本若调整需同步 */
-    height: 145px;
-  }
-
-  /* Waline 给选中态加了 0 1px 1px 边框，激活的 tab 比未激活宽 2px、高 1px，
-     切换时相邻 tab 会左右挪；给未选中的补等宽透明边框统一占位 */
-  .wl-tabs .wl-tab:not(.active) {
-    border: solid transparent;
-    border-width: 0 1px 1px;
-  }
-</style>
+<!-- 推荐友链角色检测层 -->
+<WalineRoleBadge rootSelector="#waline" />

@@ -1,246 +1,175 @@
 import {
+	LinkPreset,
 	type NavBarConfig,
 	type NavBarLink,
 	type NavBarSearchConfig,
 	NavBarSearchMethod,
-} from "../types/navBarConfig";
+} from "../types/config";
+import { siteConfig } from "./siteConfig";
 
-// ============================================================================
-// 导航栏配置 - 根据顺序动态生成导航栏链接
-// NavBar Configuration - Dynamically generate navigation bar links based on order
-// ============================================================================
+// 根据页面开关动态生成导航栏配置
 const getDynamicNavBarConfig = (): NavBarConfig => {
 	// 基础导航栏链接
-	const links: NavBarLink[] = [];
+	const links: (NavBarLink | LinkPreset)[] = [
+		// 主页
+		LinkPreset.Home,
 
-	// 主页
-	links.push(LinkPresets.Home);
+		// 文章（带下拉子菜单）
+		{
+			name: "文章",
+			url: "/posts/",
+			icon: "material-symbols:article",
+			children: [
+				// 文章列表
+				LinkPreset.Posts,
 
-	// 文章及其子菜单
+				// 文章分类
+				{
+					name: "分类",
+					url: "/categories/",
+					icon: "material-symbols:folder-open",
+				},
+
+				// 归档
+				LinkPreset.Archive,
+
+				// 写文章
+				{
+					name: "写文章",
+					url: "/write/",
+					icon: "material-symbols:edit-note",
+				},
+			],
+		},
+
+		// 网站导航
+		{
+			name: "网站导航",
+			url: "/projects/",
+			icon: "material-symbols:public",
+		},
+	];
+
+	// 动态（带下拉子菜单）
+	// 说明：/moments/ 已被迁移至 /dynamic/，因此「说说」入口已从子菜单中
+	// 移除。/moments/pinned/ 仍保留（供历史书签直接访问）。
 	links.push({
-		name: "文章",
-		url: "#",
-		icon: "material-symbols:article",
+		name: "动态",
+		url: "/dynamic/",
+		icon: "material-symbols:local-cafe",
 		children: [
-			// 归档
-			LinkPresets.Archive,
-
-			// 分类
-			LinkPresets.Categories,
-
-			// 标签
-			LinkPresets.Tags,
-
-			// 系列
-			LinkPresets.Series,
+			{
+				name: "动态",
+				url: "/dynamic/",
+				icon: "material-symbols:dynamic-feed-rounded",
+			},
+			...(siteConfig.pages.gallery
+				? [
+						{
+							name: "相册",
+							url: "/gallery/",
+							icon: "material-symbols:photo-library",
+						},
+					]
+				: []),
+			{
+				name: "留言板",
+				url: "/guestbook/",
+				icon: "material-symbols:edit-outline",
+			},
+			{
+				name: "笔记本",
+				url: "/life/notebooks/",
+				icon: "material-symbols:menu-book-outline",
+			},
+			{
+				name: "朋友的动态",
+				url: "/pengyou/",
+				icon: "material-symbols:group",
+			},
 		],
 	});
 
-	//社交及其子菜单
-	links.push({
-		name: "社交",
-		url: "#",
-		icon: "material-symbols:group",
-		children: [
-			// 友链
-			LinkPresets.Friends,
-
-			// 留言
-			LinkPresets.Guestbook,
-		],
+	// 记录入口 - 音乐、追番、番组、规划、足迹
+	const recordChildren: (NavBarLink | LinkPreset)[] = [];
+	if (siteConfig.pages.musicPage) {
+		recordChildren.push(LinkPreset.MusicPage);
+	}
+	if (siteConfig.pages.anime) {
+		recordChildren.push({
+			name: "追番",
+			url: "/anime/",
+			icon: "material-symbols:live-tv",
+		});
+	}
+	if (siteConfig.pages.bangumi) {
+		recordChildren.push({
+			name: "番组",
+			url: "/bangumi/",
+			icon: "material-symbols:movie",
+		});
+	}
+	if (siteConfig.pages.timeline) {
+		recordChildren.push(LinkPreset.Timeline);
+	}
+	if (siteConfig.pages.calendar) {
+		recordChildren.push(LinkPreset.Calendar);
+	}
+	// 规划 & 足迹
+	recordChildren.push({
+		name: "规划",
+		url: "/life/routines/",
+		icon: "material-symbols:list-alt",
+	});
+	recordChildren.push({
+		name: "足迹",
+		url: "/life/places/",
+		icon: "material-symbols:location-on",
 	});
 
-	// 我的及其子菜单
-	links.push({
-		name: "我的",
-		url: "#",
-		icon: "material-symbols:person",
-		children: [
-			// 动态
-			LinkPresets.Dynamic,
+	if (recordChildren.length > 0) {
+		const defaultUrl = siteConfig.pages.musicPage
+			? "/music/"
+			: siteConfig.pages.anime
+				? "/anime/"
+				: "/bangumi/";
 
-			// 项目
-			LinkPresets.Projects,
-
-			// 相册
-			LinkPresets.Gallery,
-
-			// 书签导航
-			LinkPresets.Booknav,
-
-			// 哔哩哔哩追番
-			LinkPresets.Bilibili,
-
-			// 番组计划
-			LinkPresets.Bangumi,
-
-			// VNDB
-			LinkPresets.VNDB,
-
-			// MyAnimeList
-			LinkPresets.MAL,
-		],
-	});
+		links.push({
+			name: "记录",
+			url: defaultUrl,
+			icon: "material-symbols:camera-outdoor",
+			children: recordChildren,
+		});
+	}
 
 	// 关于及其子菜单
 	links.push({
 		name: "关于",
-		url: "#",
+		url: "/about/",
 		icon: "material-symbols:info",
 		children: [
-			// 打赏
-			LinkPresets.Sponsor,
+			// // 外部链接
+			// LinkPreset.Fhome,
+			// LinkPreset.Fnote,
 
 			// 关于页面
-			LinkPresets.About,
+			LinkPreset.About,
+
+			// 友链
+			LinkPreset.Friends,
+
+			// 赞助
+			...(siteConfig.pages.sponsor ? [LinkPreset.Sponsor] : []),
 		],
 	});
 
-	// 自定义导航栏链接
-	links.push({
-		name: "链接",
-		url: "#",
-		icon: "material-symbols:link",
-		// 子菜单
-		children: [
-			{
-				name: "GitHub",
-				url: "https://github.com/CuteLeaf/Firefly",
-				external: true,
-				icon: "fa7-brands:github",
-			},
-			{
-				name: "Gitee",
-				url: "https://gitee.com/CuteLeaf/Firefly",
-				external: true,
-				icon: "fa7-brands:gitee",
-			},
-			{
-				name: "Firefly文档",
-				url: "https://docs-firefly.cuteleaf.cn",
-				external: true,
-				icon: "material-symbols:docs",
-			},
-		],
-	});
-
-	// 文档链接
-	// links.push({
-	// 	name: "文档",
-	// 	url: "https://docs-firefly.cuteleaf.cn",
-	// 	external: true,
-	// 	icon: "material-symbols:docs",
-	// });
-
+	// 仅返回链接，其它导航搜索相关配置在模块顶层常量中独立导出
 	return { links } as NavBarConfig;
 };
 
 // 导航搜索配置
 export const navBarSearchConfig: NavBarSearchConfig = {
 	method: NavBarSearchMethod.PageFind,
-};
-
-// ============================================================================
-// 链接预设 - 可自由自定义导航栏链接的名称、图标和URL
-// Link Presets - Allows free customization of the name, icon, and URL of navigation bar links
-// ============================================================================
-export const LinkPresets: Record<string, NavBarLink> = {
-	Home: {
-		name: "主页",
-		url: "/",
-		icon: "material-symbols:home",
-	},
-	Archive: {
-		name: "归档",
-		url: "/archive/",
-		icon: "material-symbols:archive",
-	},
-	Categories: {
-		name: "分类",
-		url: "/categories/",
-		icon: "material-symbols:folder-open-rounded",
-	},
-	Tags: {
-		name: "标签",
-		url: "/tags/",
-		icon: "material-symbols:tag-rounded",
-	},
-	Series: {
-		name: "系列",
-		url: "/series/",
-		icon: "material-symbols:layers",
-	},
-	Friends: {
-		name: "友链",
-		url: "/friends/",
-		icon: "material-symbols:link-2-rounded",
-		pageKey: "friends",
-	},
-	Guestbook: {
-		name: "留言",
-		url: "/guestbook/",
-		icon: "material-symbols:chat",
-		pageKey: "guestbook",
-	},
-	Dynamic: {
-		name: "动态",
-		url: "/dynamic/",
-		icon: "material-symbols:forum-rounded",
-		pageKey: "dynamic",
-	},
-	Projects: {
-		name: "项目",
-		url: "/projects/",
-		icon: "material-symbols:rocket-launch",
-		pageKey: "projects",
-	},
-	Gallery: {
-		name: "相册",
-		url: "/gallery/",
-		icon: "material-symbols:photo-library",
-		pageKey: "gallery",
-	},
-	Booknav: {
-		name: "书签导航",
-		url: "/booknav/",
-		icon: "material-symbols:bookmarks",
-		pageKey: "booknav",
-	},
-	Bilibili: {
-		name: "哔哩哔哩",
-		url: "/bilibili/",
-		icon: "fa7-brands:bilibili",
-		pageKey: "bilibili",
-	},
-	Bangumi: {
-		name: "番组计划",
-		url: "/bangumi/",
-		icon: "material-symbols:movie",
-		pageKey: "bangumi",
-	},
-	VNDB: {
-		name: "VNDB",
-		url: "/vndb/",
-		icon: "material-symbols:chrome-reader-mode-rounded",
-		pageKey: "vndb",
-	},
-	MAL: {
-		name: "AnimeList",
-		url: "/myanimelist/",
-		icon: "material-symbols:menu-book",
-		pageKey: "mal",
-	},
-	Sponsor: {
-		name: "打赏",
-		url: "/sponsor/",
-		icon: "material-symbols:favorite",
-		pageKey: "sponsor",
-	},
-	About: {
-		name: "关于我",
-		url: "/about/",
-		icon: "material-symbols:person",
-	},
 };
 
 export const navBarConfig: NavBarConfig = getDynamicNavBarConfig();

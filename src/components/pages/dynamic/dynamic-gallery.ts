@@ -1,199 +1,45 @@
-import * as FancyboxModule from "@fancyapps/ui";
-
-type GalleryImage = {
-	alt: string;
-	element: HTMLImageElement;
-	src: string;
-};
-
-export function registerDynamicGallery(): void {
-	if (customElements.get("dynamic-gallery")) return;
-
-	class DynamicGallery extends HTMLElement {
-		private activeIndex = 0;
-		private images: GalleryImage[] = [];
-
-		connectedCallback() {
-			if (this.dataset.ready) return;
-			const source = this.dataset.sourceId
-				? document.getElementById(this.dataset.sourceId)
-				: null;
-			if (!source) return;
-			const elements = [...source.querySelectorAll<HTMLImageElement>("img")];
-			if (elements.length === 0) return;
-			this.images = elements.map((element) => ({
-				alt: element.alt,
-				element,
-				src: element.currentSrc || element.src,
-			}));
-			this.buildGrid();
-			this.buildThumbnails();
-			this.bindControls();
-			this.dataset.ready = "true";
-			this.hidden = false;
-			document.dispatchEvent(new CustomEvent("dynamic-gallery:ready"));
+/**
+ * dynamic-gallery.ts —— 动态卡片内联图片归一化
+ * --------------------------------------------------------------
+ * DynamicFeed.svelte 每次 renderItems() 结束后都会调用本函数。
+ *
+ * 设计动机：
+ *   动态正文（entry.html）由 Markdown 渲染而来，单张图片会被包裹在 <p>
+ *   标签内（marked 默认行为）。在「朋友圈」风格布局下，单独一张图片
+ *   应当撑满卡片宽度并支持 lightbox，而不是与段落文本混排。
+ *
+ * 实现要点：
+ *   1) 仅处理正文（.dynamic-content / .moment-text）内的图片；
+ *   2) 仅当 <img> 的直接父元素是 <p> 时才执行包裹（避免误伤多次重写）；
+ *   3) 用 <figure class="dynamic-image-figure"> 替换原 <p>，保留图片 src/alt；
+ *   4) 添加 loading="lazy" 进一步推迟非视口图片加载。
+ *
+ * 该函数是幂等的：第一次调用后再调用时，由于 <p> 已被替换，img 的
+ * 父元素不再是 <p>，循环不会重复执行。
+ *
+ * 扩展建议：
+ *   - 若要接入 PhotoSwipe / Fancybox 等 lightbox 库，可在本函数末尾
+ *     通过 [data-source-id] 属性（由 DynamicFeed 写入）查询图廊节点
+ *     并初始化交互。
+ *   - 若需要支持多图网格，Firefly 原版实现了 grid-1/2/3 样式类，可
+ *     参照 src/styles/dynamic.css 中 .moment-images.grid-* 选择器扩展。
+ */
+export function registerDynamicGallery() {
+	// 仅选取正文区域内的图片，避免误处理头像/封面等其他图片
+	const images = document.querySelectorAll<HTMLImageElement>(
+		".dynamic-content img, .moment-text img",
+	);
+	images.forEach((img) => {
+		// 已处理过的 <p> 不会再被命中（被替换为 <figure>），保证幂等
+		if (img.parentElement?.tagName === "P") {
+			const p = img.parentElement;
+			const src = img.src;
+			const alt = img.alt;
+			const figure = document.createElement("figure");
+			figure.className = "dynamic-image-figure";
+			figure.innerHTML = `<img src="${src}" alt="${alt}" class="dynamic-image" loading="lazy" />`;
+			// 整段替换 <p>，保留内部 <img> 的内容
+			p.replaceWith(figure);
 		}
-
-		private buildGrid() {
-			const grid = this.querySelector<HTMLElement>("[data-gallery-grid]");
-			if (!grid) return;
-			grid.dataset.count = String(Math.min(this.images.length, 6));
-			grid.dataset.layout = this.images.length === 1 ? "single" : "grid";
-			this.images.slice(0, 6).forEach(({ element, alt }, index) => {
-				const button = document.createElement("button");
-				button.type = "button";
-				button.className = "dynamic-gallery-grid-item";
-				button.setAttribute(
-					"aria-label",
-					(this.dataset.viewImage || "View image {index}").replace(
-						"{index}",
-						String(index + 1),
-					),
-				);
-				// 只有一张图时，点击直接打开大图查看
-				if (this.images.length === 1) {
-					button.addEventListener("click", () => this.openLightbox(0));
-				} else {
-					button.addEventListener("click", () => this.open(index));
-				}
-				const container =
-					element.closest<HTMLElement>("center") ??
-					element.closest<HTMLElement>("figure") ??
-					element;
-				element.alt = alt;
-				button.append(element);
-				if (index === 5 && this.images.length > 6) {
-					const more = document.createElement("span");
-					more.className = "dynamic-gallery-more";
-					more.textContent = `+${this.images.length - 6}`;
-					button.append(more);
-				}
-				grid.append(button);
-				if (container !== element) container.remove();
-			});
-			for (const { element } of this.images.slice(6)) {
-				(
-					element.closest<HTMLElement>("center") ??
-					element.closest<HTMLElement>("figure") ??
-					element
-				).remove();
-			}
-		}
-
-		private buildThumbnails() {
-			const thumbnails = this.querySelector<HTMLElement>(
-				"[data-gallery-thumbnails]",
-			);
-			if (!thumbnails) return;
-			this.images.forEach(({ element, alt }, index) => {
-				const button = document.createElement("button");
-				button.type = "button";
-				button.className = "dynamic-gallery-thumbnail";
-				button.dataset.index = String(index);
-				button.setAttribute(
-					"aria-label",
-					(this.dataset.selectImage || "Select image {index}").replace(
-						"{index}",
-						String(index + 1),
-					),
-				);
-				button.addEventListener("click", () => this.select(index));
-				const thumbnail = element.cloneNode(true) as HTMLImageElement;
-				thumbnail.alt = alt;
-				thumbnail.removeAttribute("id");
-				button.append(thumbnail);
-				thumbnails.append(button);
-			});
-		}
-
-		private bindControls() {
-			this.querySelector("[data-gallery-collapse]")?.addEventListener(
-				"click",
-				() => this.collapse(),
-			);
-			this.querySelector("[data-gallery-prev]")?.addEventListener("click", () =>
-				this.select(this.activeIndex - 1),
-			);
-			this.querySelector("[data-gallery-next]")?.addEventListener("click", () =>
-				this.select(this.activeIndex + 1),
-			);
-			this.querySelector("[data-gallery-lightbox]")?.addEventListener(
-				"click",
-				(event) => {
-					event.preventDefault();
-					const Fancybox = FancyboxModule.Fancybox;
-					Fancybox.show(
-						this.images.map((image) => ({
-							src: image.src,
-							type: "image",
-						})),
-						{
-							startIndex: this.activeIndex,
-						},
-					);
-				},
-			);
-		}
-
-		private open(index: number) {
-			const grid = this.querySelector<HTMLElement>("[data-gallery-grid]");
-			const viewer = this.querySelector<HTMLElement>("[data-gallery-viewer]");
-			if (!grid || !viewer) return;
-			grid.hidden = true;
-			viewer.hidden = false;
-			this.select(index);
-		}
-
-		private collapse() {
-			const grid = this.querySelector<HTMLElement>("[data-gallery-grid]");
-			const viewer = this.querySelector<HTMLElement>("[data-gallery-viewer]");
-			if (!grid || !viewer) return;
-			grid.hidden = false;
-			viewer.hidden = true;
-		}
-
-		private openLightbox(index: number) {
-			const Fancybox = FancyboxModule.Fancybox;
-			Fancybox.show(
-				this.images.map((image) => ({
-					src: image.src,
-					type: "image",
-				})),
-				{ startIndex: index },
-			);
-		}
-
-		private select(index: number) {
-			this.activeIndex = (index + this.images.length) % this.images.length;
-			const counter = this.querySelector<HTMLElement>("[data-gallery-counter]");
-			if (counter)
-				counter.textContent = `${this.activeIndex + 1} / ${this.images.length}`;
-			const image = this.images[this.activeIndex];
-			const main = this.querySelector<HTMLImageElement>("[data-gallery-main]");
-			if (!main) return;
-			main.src = image.src;
-			main.alt = image.alt;
-			main.dataset.galleryIndex = String(this.activeIndex);
-			this.querySelector<HTMLElement>("[data-gallery-lightbox]")?.setAttribute(
-				"data-src",
-				image.src,
-			);
-			this.querySelectorAll<HTMLElement>(
-				"[data-gallery-thumbnails] [data-index]",
-			).forEach((thumbnail) => {
-				thumbnail.dataset.active = String(
-					Number(thumbnail.dataset.index) === this.activeIndex,
-				);
-			});
-			this.querySelector<HTMLElement>(
-				`[data-gallery-thumbnails] [data-index="${this.activeIndex}"]`,
-			)?.scrollIntoView({
-				behavior: "smooth",
-				block: "nearest",
-				inline: "center",
-			});
-		}
-	}
-
-	customElements.define("dynamic-gallery", DynamicGallery);
+	});
 }

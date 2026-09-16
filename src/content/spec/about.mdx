@@ -1,0 +1,33 @@
+import AboutChatBubble from "@/components/about/AboutChatBubble.astro";
+import AboutProfileCard from "@/components/about/AboutProfileCard.astro";
+import AboutSocialLinks from "@/components/about/AboutSocialLinks.astro";
+import AboutTechStack from "@/components/about/AboutTechStack.astro";
+import AboutTimeline from "@/components/about/AboutTimeline.astro";
+import masterAvatar from "@/assets/images/avatar.webp";
+
+## 关于我 / About Me
+
+你好，我是<AboutProfileCard
+	id="majunyu"
+	trigger="马俊宇"
+	name="马俊宇"
+	role="视觉设计师 / AI 设计师"
+	description="用 AI 工具做设计，也在学着写点东西。目标是成为内容创作者。"
+	avatar={masterAvatar}
+	/>。
+
+平时喜欢做饭，也喜欢琢磨各种 AI 工具怎么把设计做得更好看一点。
+
+### Q1：这个站点用到了哪些技术栈？
+
+这套站点是基于开源主题 Firefly 搭起来的，骨架是`Astro`，交互用`Svelte`，样式交给`Tailwind CSS`，换页靠`Swup`过渡，站内搜索用`Pagefind`。
+
+<AboutTechStack />
+
+<AboutTimeline />
+
+### Q2：怎么联系我？
+
+通过下面的方式都能找到我。
+
+<AboutSocialLinks />
